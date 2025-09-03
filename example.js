@@ -1,7 +1,6 @@
 import makeWASocket, {
 	fetchLatestBaileysVersion,
 	makeCacheableSignalKeyStore,
-	makeInMemoryStore,
 	useMultiFileAuthState,
 	Browsers,
 	DisconnectReason,
@@ -9,23 +8,12 @@ import makeWASocket, {
 import pino from "pino";
 import NodeCache from "node-cache";
 import readline from "readline";
-/** Change it to true if needed */
-const useStore = false;
 let maxRetries = 5;
 
-const MAIN_LOGGER = pino({
+const logger = pino({
 	timestamp: () => `,"time":"${new Date().toJSON()}"`,
+	level: "info"
 });
-
-const logger = MAIN_LOGGER.child({});
-logger.level = "trace";
-
-const store = useStore ? makeInMemoryStore({ logger }) : undefined; // Inisialisasi store jika penggunaan store diaktifkan
-store?.readFromFile(`store.json`);
-
-setInterval(() => {
-	store?.writeToFile("store.json");
-}, 60000 * 60);
 
 const msgRetryCounterCache = new NodeCache();
 
@@ -57,7 +45,6 @@ async function start() {
 			},
 			msgRetryCounterCache,
 		});
-	store?.bind(sock.ev);
 
 	sock.ev.on("creds.update", saveCreds);
 

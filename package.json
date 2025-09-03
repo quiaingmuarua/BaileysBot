@@ -2,7 +2,7 @@
      "name": "wabot",
      "version": "0.0.1",
      "description": "WhatsappBot",
-     "main": "example.js",
+     "main": "index.js",
      "type": "module",
      "scripts": {
           "start": "node example.js",

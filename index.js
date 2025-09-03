@@ -139,6 +139,7 @@ async function checkAccountStatus(phoneNumber) {
 async function performLogin(phoneNumber) {
 	try {
 		const authPath = join("AUTH", phoneNumber);
+		logger.info(`使用认证路径: ${authPath}`);
 		const { state, saveCreds } = await useMultiFileAuthState(authPath);
 		const { version } = await fetchLatestBaileysVersion();
 		
@@ -154,6 +155,10 @@ async function performLogin(phoneNumber) {
 				keys: makeCacheableSignalKeyStore(state.keys, silentLogger),
 			},
 			msgRetryCounterCache,
+			connectTimeoutMs: 30000,
+			defaultQueryTimeoutMs: 30000,
+			keepAliveIntervalMs: 30000,
+			markOnlineOnConnect: false,
 		});
 
 		sock.ev.on("creds.update", saveCreds);
@@ -192,41 +197,46 @@ async function performLogin(phoneNumber) {
 					});
 				} else {
 					// 需要配对码
-					const code = await sock.requestPairingCode(phoneNumber);
-					logger.info(`为手机号 ${phoneNumber} 生成配对码: ${code}`);
-					
-					// 监听配对结果
-					sock.ev.on("connection.update", (update) => {
-						const { connection, lastDisconnect } = update;
+					try {
+						const code = await sock.requestPairingCode(phoneNumber);
+						logger.info(`为手机号 ${phoneNumber} 生成配对码: ${code}`);
 						
-						if (connection === "open") {
-							clearTimeout(timeout);
-							sock.end();
-							pendingLogins.delete(phoneNumber);
-							resolve({
-								success: true,
-								message: "配对成功，登录完成",
-								jid: sock.authState.creds.me?.id || "未知"
-							});
-						} else if (connection === "close") {
-							const statusCode = lastDisconnect?.error?.output?.statusCode;
-							if (statusCode === DisconnectReason.loggedOut) {
-								clearTimeout(timeout);
+						// 立即返回配对码，不等待连接
+						clearTimeout(timeout);
+						resolve({
+							success: false,
+							requiresPairing: true,
+							pairingCode: code,
+							message: "请在 WhatsApp 中输入配对码完成登录",
+							expiresIn: "5分钟",
+							authPath: authPath
+						});
+						
+						// 在后台继续监听配对结果（可选）
+						sock.ev.on("connection.update", (update) => {
+							const { connection, lastDisconnect } = update;
+							
+							if (connection === "open") {
+								logger.info(`手机号 ${phoneNumber} 配对成功`);
 								sock.end();
 								pendingLogins.delete(phoneNumber);
-								reject(new Error("配对失败或被拒绝"));
+							} else if (connection === "close") {
+								const statusCode = lastDisconnect?.error?.output?.statusCode;
+								if (statusCode === DisconnectReason.loggedOut) {
+									logger.warn(`手机号 ${phoneNumber} 配对失败或被拒绝`);
+									sock.end();
+									pendingLogins.delete(phoneNumber);
+								}
 							}
-						}
-					});
-
-					// 立即返回配对码
-					resolve({
-						success: false,
-						requiresPairing: true,
-						pairingCode: code,
-						message: "请在 WhatsApp 中输入配对码完成登录",
-						expiresIn: "5分钟"
-					});
+						});
+						
+					} catch (pairingError) {
+						clearTimeout(timeout);
+						sock.end();
+						pendingLogins.delete(phoneNumber);
+						logger.error("生成配对码失败:", pairingError);
+						reject(new Error("生成配对码失败: " + pairingError.message));
+					}
 				}
 			} catch (error) {
 				clearTimeout(timeout);

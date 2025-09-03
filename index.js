@@ -233,7 +233,7 @@ wss.on("connection", (ws) => {
             action: "status",
             phoneNumber,
             registered,
-            connection: registered ? "unknown" : "disconnected",
+            connection: registered ? "connected" : "disconnected",
           });
         }
 
@@ -284,6 +284,7 @@ wss.on("connection", (ws) => {
           });
         }
       }
+
 
       // 未知动作
       return sendJSON(ws, { ok: false, error: "unknown action" });

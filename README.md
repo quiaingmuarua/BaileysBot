@@ -1,5 +1,50 @@
 # 🤖 WhatsApp Bot 基于 Baileys
+# WhatsApp Bot API
 
+基于 Baileys 的 WhatsApp Bot 接口服务。
+
+## 安装
+
+```bash
+npm install
+```
+
+## 运行
+
+```bash
+# 启动 Web API 服务
+npm run server
+
+# 启动示例客户端
+npm run start
+
+# 开发模式（自动重启）
+npm run dev
+```
+
+## 中文显示问题
+
+如果在控制台遇到中文乱码问题，以下是解决方法：
+
+### Windows 用户
+
+1. 确保使用的终端支持 UTF-8
+2. 在 CMD 中运行前设置代码页：`chcp 65001`
+3. 使用 PowerShell 或 Windows Terminal 可能有更好的 UTF-8 支持
+
+### 所有用户
+
+本项目已配置 pino-pretty 插件和适当的编码设置，应该能正确显示中文。如果仍有问题，可以尝试：
+
+1. 确保终端/控制台使用 UTF-8 编码
+2. 在 Node.js 环境变量中添加 `NODE_OPTIONS="--max-old-space-size=4096"`
+
+## API 接口
+
+- `POST /login` - 登录/配对 WhatsApp 账号
+- `GET /status` - 查询账号状态
+
+详细使用方法请参考代码示例。
 [![CI](https://github.com/YOUR_USERNAME/BaileysBot/workflows/CI/badge.svg)](https://github.com/YOUR_USERNAME/BaileysBot/actions/workflows/ci.yml)
 [![Security Scan](https://github.com/YOUR_USERNAME/BaileysBot/workflows/Security%20Scan/badge.svg)](https://github.com/YOUR_USERNAME/BaileysBot/actions/workflows/security.yml)
 [![Code Quality](https://github.com/YOUR_USERNAME/BaileysBot/workflows/Code%20Quality/badge.svg)](https://github.com/YOUR_USERNAME/BaileysBot/actions/workflows/code-quality.yml)

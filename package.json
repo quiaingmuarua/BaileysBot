@@ -1,0 +1,17 @@
+{
+     "name": "wabot",
+     "version": "0.0.1",
+     "description": "WhatsappBot",
+     "main": "example.js",
+     "type": "module",
+     "scripts": {
+          "start": "node example.js"
+     },
+     "dependencies": {
+          "@adiwajshing/keyed-db": "latest",
+          "node-cache": "latest",
+          "pino": "latest"
+     },
+     "author": "",
+     "license": "ISC"
+}

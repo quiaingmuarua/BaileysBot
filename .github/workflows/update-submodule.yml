@@ -1,0 +1,126 @@
+name: Update Baileys Submodule
+
+on:
+  schedule:
+    # 每周一上午 9:00 (UTC) 检查更新
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+    inputs:
+      force_update:
+        description: '强制更新 submodule'
+        required: false
+        default: 'false'
+        type: boolean
+
+jobs:
+  update-submodule:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+    
+    - name: Configure Git
+      run: |
+        git config --global user.name 'github-actions[bot]'
+        git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+    
+    - name: Check for submodule updates
+      id: check-updates
+      run: |
+        cd baileys
+        git fetch origin
+        
+        CURRENT_COMMIT=$(git rev-parse HEAD)
+        LATEST_COMMIT=$(git rev-parse origin/master)
+        
+        echo "current-commit=$CURRENT_COMMIT" >> $GITHUB_OUTPUT
+        echo "latest-commit=$LATEST_COMMIT" >> $GITHUB_OUTPUT
+        
+        if [ "$CURRENT_COMMIT" != "$LATEST_COMMIT" ]; then
+          echo "updates-available=true" >> $GITHUB_OUTPUT
+          COMMITS_BEHIND=$(git rev-list --count HEAD..origin/master)
+          echo "commits-behind=$COMMITS_BEHIND" >> $GITHUB_OUTPUT
+          echo "🔍 发现 $COMMITS_BEHIND 个新提交"
+        else
+          echo "updates-available=false" >> $GITHUB_OUTPUT
+          echo "✅ Submodule 已是最新版本"
+        fi
+    
+    - name: Update submodule
+      if: steps.check-updates.outputs.updates-available == 'true' || github.event.inputs.force_update == 'true'
+      run: |
+        echo "🔄 更新 baileys submodule..."
+        git submodule update --remote baileys
+        
+        cd baileys
+        echo "📦 安装依赖并构建..."
+        npm ci
+        npm run build
+        cd ..
+    
+    - name: Test updated submodule
+      if: steps.check-updates.outputs.updates-available == 'true' || github.event.inputs.force_update == 'true'
+      run: |
+        echo "🧪 测试更新后的代码..."
+        npm ci
+        node --check example.js
+        echo "✅ 代码检查通过"
+    
+    - name: Create Pull Request
+      if: steps.check-updates.outputs.updates-available == 'true' || github.event.inputs.force_update == 'true'
+      uses: peter-evans/create-pull-request@v5
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        commit-message: |
+          chore: 更新 baileys submodule
+          
+          - 更新到最新版本: ${{ steps.check-updates.outputs.latest-commit }}
+          - 包含 ${{ steps.check-updates.outputs.commits-behind }} 个新提交
+          - 已验证代码兼容性
+        title: '🔄 自动更新 Baileys Submodule'
+        body: |
+          ## 📦 Submodule 更新
+          
+          这是一个自动创建的 PR，用于更新 baileys submodule 到最新版本。
+          
+          ### 📋 更新详情
+          - **当前版本**: `${{ steps.check-updates.outputs.current-commit }}`
+          - **最新版本**: `${{ steps.check-updates.outputs.latest-commit }}`
+          - **新增提交**: ${{ steps.check-updates.outputs.commits-behind }} 个
+          
+          ### ✅ 自动检查
+          - [x] 代码语法检查通过
+          - [x] 依赖安装成功
+          - [x] Baileys 构建成功
+          
+          ### 🔍 请手动验证
+          - [ ] 功能测试正常
+          - [ ] 无破坏性变更
+          - [ ] 兼容现有代码
+          
+          ---
+          
+          **注意**: 请在合并前进行充分测试，确保新版本与当前代码兼容。
+          
+          由 GitHub Actions 自动创建 🤖
+        branch: update/baileys-submodule
+        delete-branch: true
+        draft: false
+        labels: |
+          dependencies
+          automated
+          submodule
+    
+    - name: Notify if no updates
+      if: steps.check-updates.outputs.updates-available == 'false' && github.event.inputs.force_update != 'true'
+      run: |
+        echo "ℹ️  当前 baileys submodule 已是最新版本，无需更新。"

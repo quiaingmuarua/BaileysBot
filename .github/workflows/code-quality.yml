@@ -1,0 +1,264 @@
+name: Code Quality
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+jobs:
+  format-check:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Install Prettier
+      run: npm install --save-dev prettier
+    
+    - name: Check code formatting
+      run: |
+        echo "🎨 检查代码格式..."
+        npx prettier --check "**/*.{js,json,md,yml,yaml}" || (
+          echo "❌ 代码格式不符合规范"
+          echo "请运行以下命令修复格式问题:"
+          echo "  npx prettier --write \"**/*.{js,json,md,yml,yaml}\""
+          exit 1
+        )
+        echo "✅ 代码格式检查通过"
+    
+    - name: Auto-fix formatting (PR only)
+      if: github.event_name == 'pull_request'
+      run: |
+        echo "🔧 自动修复格式问题..."
+        npx prettier --write "**/*.{js,json,md,yml,yaml}"
+        
+        if [ -n "$(git status --porcelain)" ]; then
+          echo "📝 发现格式问题，已自动修复"
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add .
+          git commit -m "style: 自动修复代码格式 [skip ci]" || true
+          git push || true
+        else
+          echo "✅ 无需格式修复"
+        fi
+
+  lint:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Setup ESLint
+      run: |
+        npm install --save-dev eslint @eslint/js
+        
+        # 创建基础 ESLint 配置
+        cat > eslint.config.js << 'EOF'
+        import js from '@eslint/js';
+
+        export default [
+          js.configs.recommended,
+          {
+            languageOptions: {
+              ecmaVersion: 2022,
+              sourceType: 'module',
+              globals: {
+                console: 'readonly',
+                process: 'readonly',
+                Buffer: 'readonly',
+                __dirname: 'readonly',
+                __filename: 'readonly',
+                module: 'readonly',
+                require: 'readonly',
+                global: 'readonly',
+                setTimeout: 'readonly',
+                setInterval: 'readonly',
+                clearTimeout: 'readonly',
+                clearInterval: 'readonly'
+              }
+            },
+            rules: {
+              'no-console': 'warn',
+              'no-unused-vars': 'warn',
+              'no-undef': 'error',
+              'semi': ['error', 'always'],
+              'quotes': ['error', 'double'],
+              'indent': ['error', 'tab'],
+              'no-trailing-spaces': 'error'
+            }
+          }
+        ];
+        EOF
+    
+    - name: Run ESLint
+      run: |
+        echo "🧹 运行 ESLint 检查..."
+        npx eslint example.js --max-warnings 10 || (
+          echo "❌ ESLint 检查发现问题"
+          echo "请修复上述 lint 错误后重新提交"
+          exit 1
+        )
+        echo "✅ ESLint 检查通过"
+
+  complexity-analysis:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+    
+    - name: Install complexity analysis tools
+      run: |
+        npm install --save-dev jscpd complexity-report
+    
+    - name: Check code duplication
+      run: |
+        echo "🔍 检查代码重复度..."
+        npx jscpd . --threshold 10 --reporters html,console --output ./jscpd-report || true
+        
+        if [ -f "./jscpd-report/jscpd-report.html" ]; then
+          echo "📊 代码重复度报告已生成"
+        fi
+    
+    - name: Analyze code complexity
+      run: |
+        echo "📈 分析代码复杂度..."
+        
+        # 简单的复杂度分析
+        echo "## 📊 代码复杂度分析" > complexity-report.md
+        echo "" >> complexity-report.md
+        
+        # 计算文件行数
+        LINES=$(wc -l example.js | cut -d' ' -f1)
+        echo "- **example.js**: $LINES 行" >> complexity-report.md
+        
+        # 检查函数数量
+        FUNCTIONS=$(grep -c "function\|=>" example.js || echo 0)
+        echo "- **函数数量**: $FUNCTIONS" >> complexity-report.md
+        
+        # 检查注释覆盖率
+        COMMENTS=$(grep -c "^\s*\/\/\|^\s*\/\*" example.js || echo 0)
+        COMMENT_RATIO=$(echo "scale=2; $COMMENTS * 100 / $LINES" | bc -l 2>/dev/null || echo "0")
+        echo "- **注释覆盖率**: ${COMMENT_RATIO}%" >> complexity-report.md
+        
+        echo "" >> complexity-report.md
+        echo "### 建议" >> complexity-report.md
+        
+        if [ "$LINES" -gt 200 ]; then
+          echo "- ⚠️  文件行数较多，考虑拆分为多个模块" >> complexity-report.md
+        else
+          echo "- ✅ 文件大小适中" >> complexity-report.md
+        fi
+        
+        if [ "$(echo "$COMMENT_RATIO < 10" | bc -l 2>/dev/null || echo 1)" -eq 1 ]; then
+          echo "- ⚠️  注释较少，建议增加代码注释" >> complexity-report.md
+        else
+          echo "- ✅ 注释覆盖率良好" >> complexity-report.md
+        fi
+        
+        cat complexity-report.md
+    
+    - name: Upload quality reports
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: code-quality-reports
+        path: |
+          complexity-report.md
+          jscpd-report/
+        retention-days: 30
+
+  documentation-check:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Check documentation completeness
+      run: |
+        echo "📚 检查文档完整性..."
+        
+        echo "## 📋 文档检查报告" > doc-report.md
+        echo "" >> doc-report.md
+        
+        # 检查 README 文件
+        if [ -f README.md ]; then
+          echo "✅ README.md 存在" >> doc-report.md
+          
+          # 检查 README 内容
+          if grep -q "安装" README.md || grep -q "installation" README.md; then
+            echo "✅ 包含安装说明" >> doc-report.md
+          else
+            echo "⚠️  缺少安装说明" >> doc-report.md
+          fi
+          
+          if grep -q "使用" README.md || grep -q "usage" README.md; then
+            echo "✅ 包含使用说明" >> doc-report.md
+          else
+            echo "⚠️  缺少使用说明" >> doc-report.md
+          fi
+        else
+          echo "❌ 缺少 README.md 文件" >> doc-report.md
+        fi
+        
+        # 检查代码注释
+        if grep -q "^\s*\/\/" example.js; then
+          echo "✅ 代码包含注释" >> doc-report.md
+        else
+          echo "⚠️  代码缺少注释" >> doc-report.md
+        fi
+        
+        # 检查许可证文件
+        if [ -f LICENSE ] || [ -f LICENSE.md ]; then
+          echo "✅ 包含许可证文件" >> doc-report.md
+        else
+          echo "⚠️  缺少许可证文件" >> doc-report.md
+        fi
+        
+        cat doc-report.md
+    
+    - name: Upload documentation report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: documentation-report
+        path: doc-report.md
+        retention-days: 30

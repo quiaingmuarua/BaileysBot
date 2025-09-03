@@ -1,0 +1,205 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # 每天凌晨 2:00 (UTC) 运行安全扫描
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+jobs:
+  dependency-review:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Dependency Review
+      uses: actions/dependency-review-action@v4
+      with:
+        fail-on-severity: moderate
+        allow-licenses: MIT, Apache-2.0, BSD-3-Clause, BSD-2-Clause, ISC
+
+  security-audit:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Run npm audit
+      run: |
+        echo "🔍 检查主项目依赖安全性..."
+        npm audit --audit-level moderate --production
+    
+    - name: Audit Baileys submodule
+      run: |
+        echo "🔍 检查 baileys submodule 依赖安全性..."
+        cd baileys
+        npm ci
+        npm audit --audit-level moderate --production || true
+        cd ..
+    
+    - name: Generate audit report
+      if: always()
+      run: |
+        echo "📊 生成安全审计报告..."
+        
+        echo "## 🛡️ 安全审计报告" > security-report.md
+        echo "" >> security-report.md
+        echo "### 主项目" >> security-report.md
+        npm audit --json > main-audit.json || true
+        
+        if [ -s main-audit.json ]; then
+          VULNERABILITIES=$(cat main-audit.json | jq -r '.metadata.vulnerabilities // empty')
+          if [ -n "$VULNERABILITIES" ] && [ "$VULNERABILITIES" != "null" ]; then
+            echo "发现漏洞: $VULNERABILITIES" >> security-report.md
+          else
+            echo "✅ 未发现安全漏洞" >> security-report.md
+          fi
+        else
+          echo "✅ 未发现安全漏洞" >> security-report.md
+        fi
+        
+        echo "" >> security-report.md
+        echo "### Baileys Submodule" >> security-report.md
+        cd baileys
+        npm audit --json > ../baileys-audit.json || true
+        cd ..
+        
+        if [ -s baileys-audit.json ]; then
+          BAILEYS_VULNERABILITIES=$(cat baileys-audit.json | jq -r '.metadata.vulnerabilities // empty')
+          if [ -n "$BAILEYS_VULNERABILITIES" ] && [ "$BAILEYS_VULNERABILITIES" != "null" ]; then
+            echo "发现漏洞: $BAILEYS_VULNERABILITIES" >> security-report.md
+          else
+            echo "✅ 未发现安全漏洞" >> security-report.md
+          fi
+        else
+          echo "✅ 未发现安全漏洞" >> security-report.md
+        fi
+        
+        cat security-report.md
+    
+    - name: Upload audit artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: security-audit-report
+        path: |
+          security-report.md
+          main-audit.json
+          baileys-audit.json
+        retention-days: 30
+
+  codeql-analysis:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'javascript' ]
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: ${{ matrix.language }}
+        queries: security-extended,security-and-quality
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: |
+        npm ci
+        cd baileys
+        npm ci
+        npm run build
+        cd ..
+    
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
+      with:
+        category: "/language:${{matrix.language}}"
+
+  secret-scan:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        submodules: recursive
+    
+    - name: Run Trivy secret scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-secrets.sarif'
+        scanners: 'secret'
+    
+    - name: Upload Trivy scan results
+      if: always()
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: 'trivy-secrets.sarif'
+    
+    - name: Check for exposed secrets
+      run: |
+        echo "🔍 检查是否有暴露的敏感信息..."
+        
+        # 检查常见的敏感信息模式
+        PATTERNS=(
+          "password\s*[=:]\s*['\"][^'\"]+['\"]"
+          "api[_-]?key\s*[=:]\s*['\"][^'\"]+['\"]"
+          "secret\s*[=:]\s*['\"][^'\"]+['\"]"
+          "token\s*[=:]\s*['\"][^'\"]+['\"]"
+          "private[_-]?key"
+        )
+        
+        FOUND_SECRETS=false
+        for pattern in "${PATTERNS[@]}"; do
+          if grep -r -i -E "$pattern" . --exclude-dir=.git --exclude-dir=node_modules --exclude="*.md"; then
+            echo "⚠️  发现可能的敏感信息: $pattern"
+            FOUND_SECRETS=true
+          fi
+        done
+        
+        if [ "$FOUND_SECRETS" = false ]; then
+          echo "✅ 未发现明显的敏感信息泄露"
+        fi

@@ -11,10 +11,11 @@
      },
      "dependencies": {
           "@adiwajshing/keyed-db": "latest",
+          "cors": "^2.8.5",
+          "express": "^4.18.2",
           "node-cache": "latest",
           "pino": "latest",
-          "express": "^4.18.2",
-          "cors": "^2.8.5",
+          "qrcode-terminal": "0.12.0",
           "ws": "^8.18.3"
      },
      "author": "",

@@ -5,8 +5,8 @@ const ws = new WebSocket("ws://localhost:3001");
 ws.on("open", () => {
   const requestId = String(Date.now());
   ws.send(JSON.stringify({
-    action: "status",
-    phoneNumber: "66644531785",
+    action: "login",
+    phoneNumber: "447999803105",
     waitMs: 60000,
     requestId
   }));

@@ -5,7 +5,8 @@ const ws = new WebSocket('ws://localhost:3001');
 
 const phoneNumber = process.argv[2];
 if (!phoneNumber) {
-  console.log('使用方法: node simple_test.js +1234567890');
+  console.log('使用方法: node simple_test.js 66961687880');
+  console.log('注意：号码不需要加号前缀');
   process.exit(1);
 }
 

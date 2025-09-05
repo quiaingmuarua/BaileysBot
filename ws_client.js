@@ -6,7 +6,7 @@ ws.on("open", () => {
   const requestId = String(Date.now());
   ws.send(JSON.stringify({
     action: "login",
-    phoneNumber: "447999803105",
+    phoneNumber: "66961687880",
     waitMs: 60000,
     requestId
   }));

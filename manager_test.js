@@ -14,7 +14,7 @@ const ws = new WebSocket('ws://localhost:3001');
 // 显示菜单
 function showMenu() {
   console.log('\n🔧 长连接管理器 - 可用操作:');
-  console.log('1. login <手机号>     - 登录/配对');
+  console.log('1. login <手机号>     - 登录/配对 (如: login 66961687880)');
   console.log('2. status <手机号>    - 查看状态');
   console.log('3. list              - 列出所有连接');
   console.log('4. disconnect <手机号> - 断开连接');
@@ -22,6 +22,7 @@ function showMenu() {
   console.log('6. help              - 显示帮助');
   console.log('7. exit              - 退出');
   console.log('=====================================');
+  console.log('注意：手机号格式不带加号，如: 66961687880');
 }
 
 ws.on('open', () => {
@@ -75,7 +76,7 @@ async function startCommandLoop() {
       if (command === 'login') {
         const phoneNumber = parts[1];
         if (!phoneNumber) {
-          console.log('❌ 请提供手机号，例如: login +1234567890');
+          console.log('❌ 请提供手机号，例如: login 66961687880');
           continue;
         }
         
@@ -91,7 +92,7 @@ async function startCommandLoop() {
       if (command === 'status') {
         const phoneNumber = parts[1];
         if (!phoneNumber) {
-          console.log('❌ 请提供手机号，例如: status +1234567890');
+          console.log('❌ 请提供手机号，例如: status 66961687880');
           continue;
         }
         
@@ -112,7 +113,7 @@ async function startCommandLoop() {
       if (command === 'disconnect') {
         const phoneNumber = parts[1];
         if (!phoneNumber) {
-          console.log('❌ 请提供手机号，例如: disconnect +1234567890');
+          console.log('❌ 请提供手机号，例如: disconnect 66961687880');
           continue;
         }
         
@@ -126,7 +127,7 @@ async function startCommandLoop() {
       if (command === 'reconnect') {
         const phoneNumber = parts[1];
         if (!phoneNumber) {
-          console.log('❌ 请提供手机号，例如: reconnect +1234567890');
+          console.log('❌ 请提供手机号，例如: reconnect 66961687880');
           continue;
         }
         

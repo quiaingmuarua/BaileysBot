@@ -1,6 +1,6 @@
 // WebSocket 长连接 Baileys 服务（Node 18+）
 // ACTIONS
-// - login:     {action:"login", phoneNumber:"xxxx", waitMs?:30000, requestId?:string}
+// - login:     {action:"login", phoneNumber:"+1xxxx", waitMs?:30000, requestId?:string}
 //              → 第一条: {ok:true, action:"login", phase:"pairing", pairingCode, status:"waiting", ...}
 //              → 第二条: {ok:true, action:"login", phase:"final",   pairingCode, status:"connected"|"pending", ...}
 // - status:    {action:"status", phoneNumber:"+1xxxx"}
@@ -12,256 +12,23 @@
 // - reconnect: {action:"reconnect", phoneNumber:"+1xxxx"}
 //              → {ok:true, action:"reconnect", phoneNumber, status}
 
-import { WebSocketServer } from "ws";
+import {WebSocketServer} from "ws";
 import pino from "pino";
 import NodeCache from "node-cache";
 import {
+  Browsers,
   default as makeWASocket,
+  DisconnectReason,
   fetchLatestBaileysVersion,
   makeCacheableSignalKeyStore,
   useMultiFileAuthState,
-  Browsers,
-} from "./baileys/lib/index.js"; // 如使用 npm 版请改为: from "baileys"
+} from "./baileys/lib/index.js"; // 如用 npm 版改为: "baileys"
 
 const logger = pino({ level: "info" });
 const silent = pino({ level: "silent" });
+
+// Baileys 推荐：缓存消息重试计数
 const msgRetryCounterCache = new NodeCache();
-
-/* -------------------- 连接管理器 -------------------- */
-
-class ConnectionManager {
-  constructor() {
-    this.connections = new Map(); // phoneNumber -> connectionInfo
-  }
-
-  // 创建或获取连接
-  async getOrCreateConnection(phoneNumber) {
-    if (this.connections.has(phoneNumber)) {
-      const conn = this.connections.get(phoneNumber);
-      if (conn.status === 'connected' || conn.status === 'connecting') {
-        return conn;
-      }
-    }
-
-    return await this.createConnection(phoneNumber);
-  }
-
-  // 创建新连接
-  async createConnection(phoneNumber) {
-    logger.info({ phoneNumber }, "🔄 创建新的长连接...");
-    
-    const authPath = `AUTH/${phoneNumber}`;
-    const { state, saveCreds } = await useMultiFileAuthState(authPath);
-    const { version } = await fetchLatestBaileysVersion();
-
-    const sock = makeWASocket({
-      version,
-      logger: silent,
-      printQRInTerminal: false,
-      browser: Browsers.macOS("Safari"),
-      auth: {
-        creds: state.creds,
-        keys: makeCacheableSignalKeyStore(state.keys, silent),
-      },
-      msgRetryCounterCache,
-    });
-
-    const connectionInfo = {
-      phoneNumber,
-      sock,
-      state,
-      saveCreds,
-      status: 'connecting',
-      createdAt: new Date(),
-      lastActivity: new Date(),
-      isRegistered: !!state?.creds?.registered,
-      pairingCode: null,
-      heartbeatTimer: null,
-      events: [],
-    };
-
-    // 设置事件监听
-    this.setupConnectionEvents(connectionInfo);
-    
-    this.connections.set(phoneNumber, connectionInfo);
-    logger.info({ phoneNumber }, "✅ 长连接已创建");
-    
-    return connectionInfo;
-  }
-
-  // 设置连接事件监听
-  setupConnectionEvents(connectionInfo) {
-    const { phoneNumber, sock } = connectionInfo;
-
-    sock.ev.on("creds.update", connectionInfo.saveCreds);
-
-    // 使用 process 方法处理事件（和 example.js 保持一致）
-    sock.ev.process(async (events) => {
-      // 处理连接状态更新
-      if (events["connection.update"]) {
-        const update = events["connection.update"];
-        const { connection, lastDisconnect, qr } = update;
-        connectionInfo.lastActivity = new Date();
-        
-        logger.info({ phoneNumber, connection }, `🔄 连接状态更新: ${connection}`);
-        
-        if (connection === "open") {
-          connectionInfo.status = 'connected';
-          logger.info({ phoneNumber }, "✅ 连接已建立！");
-        } else if (connection === "close") {
-          connectionInfo.status = 'disconnected';
-          logger.info({ phoneNumber }, "❌ 连接已断开");
-          
-          // 自动重连逻辑（和 example.js 类似）
-          const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== 401;
-          if (shouldReconnect) {
-            logger.info({ phoneNumber }, "🔄 准备自动重连...");
-            setTimeout(() => {
-              if (this.connections.has(phoneNumber)) {
-                this.reconnect(phoneNumber);
-              }
-            }, 5000);
-          }
-        } else if (connection === "connecting") {
-          connectionInfo.status = 'connecting';
-        }
-
-        if (qr) {
-          connectionInfo.qr = qr;
-          logger.info({ phoneNumber }, "📱 QR码已生成");
-        }
-      }
-
-      // 处理接收到的消息
-      if (events["messages.upsert"]) {
-        const upsert = events["messages.upsert"];
-        connectionInfo.lastActivity = new Date();
-        logger.info({ phoneNumber, msgCount: upsert.messages.length }, "📨 收到消息");
-      }
-    });
-  }
-
-  // 重连
-  async reconnect(phoneNumber) {
-    logger.info({ phoneNumber }, "🔄 开始重连...");
-    await this.disconnect(phoneNumber);
-    return await this.createConnection(phoneNumber);
-  }
-
-  // 断开连接
-  async disconnect(phoneNumber) {
-    const conn = this.connections.get(phoneNumber);
-    if (!conn) return;
-
-    logger.info({ phoneNumber }, "🔌 断开连接...");
-    
-    try {
-      if (conn.heartbeatTimer) {
-        clearInterval(conn.heartbeatTimer);
-      }
-      conn.sock.ev.removeAllListeners();
-      await conn.sock.ws?.close?.();
-      await conn.saveCreds();
-    } catch (e) {
-      logger.warn({ phoneNumber, error: e.message }, "断开连接时出错");
-    }
-
-    this.connections.delete(phoneNumber);
-    logger.info({ phoneNumber }, "✅ 连接已清理");
-  }
-
-  // 获取连接信息
-  getConnection(phoneNumber) {
-    return this.connections.get(phoneNumber);
-  }
-
-  // 获取所有连接
-  getAllConnections() {
-    return Array.from(this.connections.values()).map(conn => ({
-      phoneNumber: conn.phoneNumber,
-      status: conn.status,
-      isRegistered: conn.isRegistered,
-      createdAt: conn.createdAt,
-      lastActivity: conn.lastActivity,
-    }));
-  }
-
-  // 生成配对码
-  async requestPairingCode(phoneNumber) {
-    const conn = await this.getOrCreateConnection(phoneNumber);
-    
-    if (conn.isRegistered) {
-      logger.info({ phoneNumber }, "账号已注册，无需配对码");
-      return null;
-    }
-
-    // 立即生成配对码，不等待WebSocket连接（和example.js保持一致）
-    const pairingCode = await conn.sock.requestPairingCode(phoneNumber);
-    conn.pairingCode = pairingCode;
-    
-    logger.info({ phoneNumber, pairingCode }, "🔑 配对码已生成");
-    return pairingCode;
-  }
-
-  // 等待连接建立
-  async waitForConnection(phoneNumber, waitMs = 30000) {
-    const conn = this.getConnection(phoneNumber);
-    if (!conn) throw new Error("连接不存在");
-
-    if (conn.status === 'connected') {
-      return 'connected';
-    }
-
-    return new Promise((resolve) => {
-      let done = false;
-      let heartbeatCount = 0;
-      
-      const timer = setTimeout(() => {
-        if (done) return;
-        done = true;
-        clearInterval(heartbeatTimer);
-        logger.info({ phoneNumber }, "⏰ 等待连接超时");
-        resolve("pending");
-      }, waitMs);
-
-      // 心跳监控
-      const heartbeatTimer = setInterval(() => {
-        if (done) return;
-        heartbeatCount++;
-        const elapsed = heartbeatCount * 5;
-        const remaining = Math.max(0, Math.ceil((waitMs - elapsed * 1000) / 1000));
-        
-        // 检查状态是否已更新
-        if (conn.status === 'connected') {
-          done = true;
-          clearTimeout(timer);
-          clearInterval(heartbeatTimer);
-          logger.info({ phoneNumber }, "✅ 连接建立成功！");
-          resolve("connected");
-          return;
-        }
-        
-        logger.info({ 
-          phoneNumber, 
-          elapsed: `${elapsed}s`, 
-          remaining: `${remaining}s`,
-          heartbeat: heartbeatCount,
-          status: conn.status
-        }, "💓 等待连接中...");
-      }, 5000);
-
-      // 首次检查，可能已经连接了
-      if (conn.status === 'connected') {
-        done = true;
-        clearTimeout(timer);
-        clearInterval(heartbeatTimer);
-        resolve("connected");
-      }
-    });
-  }
-}
-
-const connectionManager = new ConnectionManager();
 
 /* -------------------- 工具函数 -------------------- */
 
@@ -278,7 +45,86 @@ function sendJSON(ws, obj) {
   }
 }
 
-// 同手机号串行互斥，避免 AUTH 目录竞态
+// 等待 Baileys 底层 ws 打开，避免 428/Connection Closed
+function waitWsOpen(sock, timeoutMs = 10000) {
+  return new Promise((resolve, reject) => {
+    try {
+      if (sock?.ws?.readyState === 1) return resolve(); // 1 = OPEN
+      const onOpen = () => {
+        cleanup();
+        resolve();
+      };
+      const onClose = () => {
+        cleanup();
+        reject(new Error("WS closed before open"));
+      };
+      const onError = (err) => {
+        cleanup();
+        reject(err || new Error("WS error before open"));
+      };
+
+      const timer = setTimeout(() => {
+        cleanup();
+        reject(new Error("WS open timeout"));
+      }, timeoutMs);
+
+      function cleanup() {
+        clearTimeout(timer);
+        try {
+          sock.ws?.off?.("open", onOpen);
+        } catch {
+        }
+        try {
+          sock.ws?.off?.("close", onClose);
+        } catch {
+        }
+        try {
+          sock.ws?.off?.("error", onError);
+        } catch {
+        }
+      }
+
+      sock.ws?.on?.("open", onOpen);
+      sock.ws?.on?.("close", onClose);
+      sock.ws?.on?.("error", onError);
+    } catch (e) {
+      reject(e);
+    }
+  });
+}
+
+// 等待 connection.update=open 或超时，返回 "connected"|"pending"
+function waitForOpenOnce(sock, waitMs) {
+  return new Promise((resolve) => {
+    let done = false;
+    const timer = setTimeout(() => {
+      if (done) return;
+      done = true;
+      try {
+        sock.ev.off("connection.update", onUpdate);
+      } catch {
+      }
+      resolve("pending");
+    }, waitMs);
+
+    const onUpdate = (u) => {
+      if (done) return;
+      if (u.connection === "open") {
+        done = true;
+        clearTimeout(timer);
+        try {
+          sock.ev.off("connection.update", onUpdate);
+        } catch {
+        }
+        resolve("connected");
+      }
+      // close 情况保持等待，让用户还能在手机端操作直到超时
+    };
+    sock.ev.on("connection.update", onUpdate);
+  });
+}
+
+// 单号互斥，避免 AUTH/<phone> 目录竞态
 const phoneLocks = new Map(); // phone -> Promise
 async function withPhoneLock(phone, fn) {
   const prev = phoneLocks.get(phone) || Promise.resolve();
@@ -288,11 +134,202 @@ async function withPhoneLock(phone, fn) {
   try {
     return await fn();
   } finally {
-    release(); // 释放
+    release();
     if (phoneLocks.get(phone) === next) phoneLocks.delete(phone);
   }
 }
 
+/* -------------------- 会话管理 -------------------- */
+
+const sessions = new Map(); // phoneNumber -> Session
+
+function sessionSummary(s) {
+  return {
+    phoneNumber: s.phoneNumber,
+    registered: !!s.registered,
+    connection: s.lastConnection || "disconnected",
+    retriesLeft: s.retriesLeft,
+    autoReconnect: s.autoReconnect,
+    createdAt: s.createdAt,
+    updatedAt: s.updatedAt,
+  };
+}
+
+async function ensureSession(phoneNumber) {
+  phoneNumber = normalizePhone(phoneNumber);
+
+  if (sessions.has(phoneNumber)) {
+    return sessions.get(phoneNumber);
+  }
+
+  return await withPhoneLock(phoneNumber, async () => {
+    if (sessions.has(phoneNumber)) return sessions.get(phoneNumber);
+
+    const authPath = `AUTH/${phoneNumber}`;
+    const {state, saveCreds} = await useMultiFileAuthState(authPath);
+    const {version} = await fetchLatestBaileysVersion();
+
+    const sock = makeWASocket({
+      version,
+      logger: silent,
+      printQRInTerminal: false,
+      browser: Browsers.macOS("Safari"),
+      auth: {
+        creds: state.creds,
+        keys: makeCacheableSignalKeyStore(state.keys, silent),
+      },
+      msgRetryCounterCache,
+    });
+
+    const session = {
+      phoneNumber,
+      authPath,
+      sock,
+      saveCreds,
+      registered: !!state?.creds?.registered,
+      lastConnection: "connecting",
+      retriesLeft: 5,
+      autoReconnect: true,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+
+    sessions.set(phoneNumber, session);
+
+    // 自动保存凭据
+    sock.ev.on("creds.update", async () => {
+      try {
+        await saveCreds();
+      } catch {
+      }
+      session.registered = !!sock.authState?.creds?.registered;
+      session.updatedAt = Date.now();
+    });
+
+    // 连接状态与重连策略
+    sock.ev.process(async (events) => {
+      if (events["connection.update"]) {
+        const update = events["connection.update"];
+        const {connection, lastDisconnect} = update;
+
+        if (connection) {
+          session.lastConnection = connection;
+          session.updatedAt = Date.now();
+        }
+
+        if (connection === "open") {
+          session.retriesLeft = 5;
+          session.registered = !!sock.authState?.creds?.registered;
+          logger.info({phoneNumber}, "连接已建立");
+        }
+
+        if (connection === "close") {
+          const code = lastDisconnect?.error?.output?.statusCode;
+          const loggedOut = code === DisconnectReason.loggedOut;
+
+          logger.warn({phoneNumber, code, loggedOut}, "连接关闭");
+
+          if (!loggedOut && session.autoReconnect && session.retriesLeft > 0) {
+            session.retriesLeft -= 1;
+            const delay = 3000; // 简单固定重连间隔；可改指数退避
+            logger.warn({phoneNumber, retriesLeft: session.retriesLeft}, "准备重连");
+            setTimeout(() => {
+              // 仅当还在 sessions 且允许重连时才重建
+              if (sessions.get(phoneNumber) === session && session.autoReconnect) {
+                // 重新建立 socket
+                recreateSocket(session).catch((e) =>
+                    logger.error({phoneNumber, err: e}, "重连失败")
+                );
+              }
+            }, delay);
+          }
+        }
+      }
+    });
+
+    return session;
+  });
+}
+
+async function recreateSocket(session) {
+  const {phoneNumber, authPath} = session;
+  const {state, saveCreds} = await useMultiFileAuthState(authPath);
+  const {version} = await fetchLatestBaileysVersion();
+
+  // 关闭旧的
+  try {
+    session.sock.ev.removeAllListeners();
+  } catch {
+  }
+  try {
+    await session.sock.ws?.close?.();
+  } catch {
+  }
+
+  const sock = makeWASocket({
+    version,
+    logger: silent,
+    printQRInTerminal: false,
+    browser: Browsers.macOS("Safari"),
+    auth: {
+      creds: state.creds,
+      keys: makeCacheableSignalKeyStore(state.keys, silent),
+    },
+    msgRetryCounterCache,
+  });
+
+  session.sock = sock;
+  session.saveCreds = saveCreds;
+  session.lastConnection = "connecting";
+  session.updatedAt = Date.now();
+
+  sock.ev.on("creds.update", async () => {
+    try {
+      await saveCreds();
+    } catch {
+    }
+    session.registered = !!sock.authState?.creds?.registered;
+    session.updatedAt = Date.now();
+  });
+
+  sock.ev.process(async (events) => {
+    if (events["connection.update"]) {
+      const update = events["connection.update"];
+      const {connection, lastDisconnect} = update;
+
+      if (connection) {
+        session.lastConnection = connection;
+        session.updatedAt = Date.now();
+      }
+
+      if (connection === "open") {
+        session.retriesLeft = 5;
+        session.registered = !!sock.authState?.creds?.registered;
+        logger.info({phoneNumber}, "重连成功");
+      }
+
+      if (connection === "close") {
+        const code = lastDisconnect?.error?.output?.statusCode;
+        const loggedOut = code === DisconnectReason.loggedOut;
+
+        logger.warn({phoneNumber, code, loggedOut}, "重连后连接关闭");
+
+        if (!loggedOut && session.autoReconnect && session.retriesLeft > 0) {
+          session.retriesLeft -= 1;
+          setTimeout(() => {
+            if (sessions.get(phoneNumber) === session && session.autoReconnect) {
+              recreateSocket(session).catch((e) =>
+                  logger.error({phoneNumber, err: e}, "再次重连失败")
+              );
+            }
+          }, 3000);
+        }
+      }
+    }
+  });
+
+  return session;
+}
 
 /* -------------------- WebSocket 服务器 -------------------- */
 
@@ -316,179 +353,161 @@ wss.on("connection", (ws) => {
     if (!action) return sendJSON(ws, { ok: false, error: "missing action" });
 
     try {
-      /* ---------- 登录：使用长连接管理器 ---------- */
       if (action === "login") {
-        const { phoneNumber: pn, waitMs = 30000, requestId } = msg;
+        const {phoneNumber: pn, waitMs = 30000, requestId} = msg;
         const phoneNumber = normalizePhone(pn);
 
-        await withPhoneLock(phoneNumber, async () => {
+        const session = await ensureSession(phoneNumber);
+
+        // 严格等待到底层连接 open（任一策略成功即算 open）
+        try {
+          await Promise.race([
+            waitWsOpen(session.sock, 10000),
+            waitConnUpdateOpen(session.sock, 15000)
+          ]);
+        } catch (err) {
+          return sendJSON(ws, {
+            ok: false,
+            action: "login",
+            phoneNumber,
+            error: "socket-not-open: " + (err?.message || String(err))
+          });
+        }
+
+        session.registered = !!session.sock.authState?.creds?.registered;
+
+        let pairingCode = null;
+        if (!session.registered) {
           try {
-            logger.info({ phoneNumber }, "🚀 开始登录流程（长连接模式）...");
-            
-            // 1) 获取或创建连接
-            const conn = await connectionManager.getOrCreateConnection(phoneNumber);
-            
-            // 2) 生成配对码（如果需要）
-            let pairingCode = null;
-            if (!conn.isRegistered) {
-              logger.info({ phoneNumber }, "📱 正在生成配对码...");
-              pairingCode = await connectionManager.requestPairingCode(phoneNumber);
-            } else {
-              logger.info({ phoneNumber }, "✅ 已注册账号，无需配对码");
-            }
-
-            // 3) 立即推送第一条（显示配对码 + 等待中）
-            logger.info({ phoneNumber }, "📤 推送配对码给客户端...");
-            sendJSON(ws, {
-              ok: true,
-              action: "login",
-              phase: "pairing",
-              phoneNumber,
-              pairingCode,
-              status: "waiting",
-              requestId,
-            });
-
-            // 4) 等待连接建立
-            const status = await connectionManager.waitForConnection(phoneNumber, waitMs);
-
-            // 5) 推送最终状态
-            logger.info({ phoneNumber, status }, `📡 推送最终状态: ${status}`);
-            sendJSON(ws, {
-              ok: true,
-              action: "login",
-              phase: "final",
-              phoneNumber,
-              pairingCode,
-              status,
-              requestId,
-            });
-            
-            if (status === "connected") {
-              logger.info({ phoneNumber }, "🎉 登录成功！连接将保持活跃");
-            } else {
-              logger.info({ phoneNumber }, "⚠️ 登录超时，连接仍在后台运行");
-            }
+            pairingCode = await session.sock.requestPairingCode(phoneNumber);
+            logger.info({phoneNumber, pairingCode}, "配对码已生成");
           } catch (e) {
-            logger.error({ phoneNumber, error: e.message }, "❌ 登录过程中出错");
-            sendJSON(ws, {
+            logger.error({phoneNumber, err: e}, "生成配对码失败");
+            return sendJSON(ws, {
               ok: false,
               action: "login",
               phoneNumber,
-              error: String(e?.message || e),
-              requestId,
+              error: "pairing-failed: " + (e?.message || String(e))
             });
           }
+        }
+
+        // 第一条：立即回配对码
+        sendJSON(ws, {
+          ok: true,
+          action: "login",
+          phase: "pairing",
+          phoneNumber,
+          pairingCode,
+          status: session.registered ? "already-registered" : "waiting",
+          requestId,
+        });
+
+        // 第二条：等最多 waitMs 看是否 open（配对成功）
+        const status = await waitForOpenOnce(session.sock, waitMs);
+        sendJSON(ws, {
+          ok: true,
+          action: "login",
+          phase: "final",
+          phoneNumber,
+          pairingCode,
+          status, // "connected" | "pending"
+          requestId,
         });
 
         return;
       }
 
-      /* ---------- 列出所有连接 ---------- */
-      if (action === "list") {
-        const connections = connectionManager.getAllConnections();
-        logger.info({ count: connections.length }, "📋 列出所有连接");
-        
-        return sendJSON(ws, {
-          ok: true,
-          action: "list",
-          connections,
-          count: connections.length,
-        });
-      }
 
-      /* ---------- 断开连接 ---------- */
-      if (action === "disconnect") {
-        const { phoneNumber: pn } = msg;
-        const phoneNumber = normalizePhone(pn);
-        
-        logger.info({ phoneNumber }, "🔌 断开连接请求");
-        await connectionManager.disconnect(phoneNumber);
-        
-        return sendJSON(ws, {
-          ok: true,
-          action: "disconnect",
-          phoneNumber,
-        });
-      }
-
-      /* ---------- 重新连接 ---------- */
-      if (action === "reconnect") {
-        const { phoneNumber: pn } = msg;
-        const phoneNumber = normalizePhone(pn);
-        
-        try {
-          logger.info({ phoneNumber }, "🔄 重新连接请求");
-          const conn = await connectionManager.reconnect(phoneNumber);
-          
-          return sendJSON(ws, {
-            ok: true,
-            action: "reconnect",
-            phoneNumber,
-            status: conn.status,
-          });
-        } catch (e) {
-          logger.error({ phoneNumber, error: e.message }, "❌ 重连失败");
-          return sendJSON(ws, {
-            ok: false,
-            action: "reconnect",
-            phoneNumber,
-            error: String(e?.message || e),
-          });
-        }
-      }
-
-      /* ---------- 状态：检查连接状态 ---------- */
+      /* ---------- status：返回账号状态 ---------- */
       if (action === "status") {
         const { phoneNumber: pn } = msg;
         const phoneNumber = normalizePhone(pn);
 
-        logger.info({ phoneNumber }, "📋 查询连接状态");
-        
-        const conn = connectionManager.getConnection(phoneNumber);
-        
-        if (!conn) {
-          // 如果没有活跃连接，检查是否有认证文件
-          try {
-            const authPath = `AUTH/${phoneNumber}`;
-            const { state } = await useMultiFileAuthState(authPath);
-            const registered = !!state?.creds?.registered;
-            
-            return sendJSON(ws, {
-              ok: true,
-              action: "status",
-              phoneNumber,
-              registered,
-              connection: "disconnected",
-              hasAuth: registered,
-            });
-          } catch (e) {
-            return sendJSON(ws, {
-              ok: true,
-              action: "status",
-              phoneNumber,
-              registered: false,
-              connection: "disconnected",
-              hasAuth: false,
-            });
-          }
+        if (sessions.has(phoneNumber)) {
+          const s = sessions.get(phoneNumber);
+          // 同步一下 registered
+          s.registered = !!s.sock.authState?.creds?.registered;
+          return sendJSON(ws, {
+            ok: true,
+            action: "status",
+            phoneNumber,
+            registered: s.registered,
+            connection: s.lastConnection || "disconnected",
+          });
         }
 
-        // 有活跃连接
+        // 若内存中没有会话，读本地凭据判断是否已注册
+        const {state} = await useMultiFileAuthState(`AUTH/${phoneNumber}`);
         return sendJSON(ws, {
           ok: true,
           action: "status",
           phoneNumber,
-          registered: conn.isRegistered,
-          connection: conn.status,
-          createdAt: conn.createdAt,
-          lastActivity: conn.lastActivity,
-          pairingCode: conn.pairingCode,
+          registered: !!state?.creds?.registered,
+          connection: "disconnected",
         });
       }
 
+      /* ---------- list：列出所有在线会话 ---------- */
+      if (action === "list") {
+        const connections = Array.from(sessions.values()).map(sessionSummary);
+        return sendJSON(ws, {ok: true, action: "list", connections});
+      }
 
-      // 未知动作
+      /* ---------- disconnect：手动断开某个号码 ---------- */
+      if (action === "disconnect") {
+        const {phoneNumber: pn} = msg;
+        const phoneNumber = normalizePhone(pn);
+
+        if (!sessions.has(phoneNumber)) {
+          return sendJSON(ws, {ok: true, action: "disconnect", phoneNumber, note: "not-found"});
+        }
+
+        const s = sessions.get(phoneNumber);
+        s.autoReconnect = false; // 禁止自动重连
+        try {
+          s.sock.ev.removeAllListeners();
+        } catch {
+        }
+        try {
+          await s.sock.ws?.close?.();
+        } catch {
+        }
+        sessions.delete(phoneNumber);
+
+        return sendJSON(ws, {ok: true, action: "disconnect", phoneNumber});
+      }
+
+      /* ---------- reconnect：重建连接（若无内存会话则新建） ---------- */
+      if (action === "reconnect") {
+        const {phoneNumber: pn} = msg;
+        const phoneNumber = normalizePhone(pn);
+
+        if (sessions.has(phoneNumber)) {
+          const s = sessions.get(phoneNumber);
+          s.autoReconnect = true;
+          await recreateSocket(s);
+          // 尝试快速等 5s
+          let status = "connecting";
+          try {
+            const r = await waitForOpenOnce(s.sock, 5000);
+            status = r === "connected" ? "connected" : "pending";
+          } catch { /* 忽略 */
+          }
+          return sendJSON(ws, {ok: true, action: "reconnect", phoneNumber, status});
+        } else {
+          const s = await ensureSession(phoneNumber);
+          let status = "connecting";
+          try {
+            const r = await waitForOpenOnce(s.sock, 5000);
+            status = r === "connected" ? "connected" : "pending";
+          } catch { /* 忽略 */
+          }
+          return sendJSON(ws, {ok: true, action: "reconnect", phoneNumber, status});
+        }
+      }
+
+      /* ---------- 未知动作 ---------- */
       return sendJSON(ws, { ok: false, error: "unknown action" });
     } catch (e) {
       logger.error(e, "WS action error");
@@ -501,19 +520,17 @@ wss.on("connection", (ws) => {
 
 process.on("SIGINT", async () => {
   logger.info("SIGINT, shutting down...");
-  
-  // 清理所有连接
-  const connections = connectionManager.getAllConnections();
-  logger.info({ count: connections.length }, "🧹 清理所有连接...");
-  
-  for (const conn of connections) {
+  for (const [, s] of sessions) {
+    s.autoReconnect = false;
     try {
-      await connectionManager.disconnect(conn.phoneNumber);
-    } catch (e) {
-      logger.warn({ phoneNumber: conn.phoneNumber, error: e.message }, "清理连接时出错");
+      s.sock.ev.removeAllListeners();
+    } catch {
+    }
+    try {
+      await s.sock.ws?.close?.();
+    } catch {
     }
   }
-  
   wss.close(() => process.exit(0));
 });
 

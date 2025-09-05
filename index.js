@@ -2,8 +2,8 @@
 // WebSocket 长连接 Baileys 服务（Node 18+）
 // ACTIONS
 // - login:     {action:"login", phoneNumber:"12345678901", waitMs?:30000, requestId?:string}
-//              → 第一条: {ok:true, action:"login", phase:"pairing", pairingCode, status:"waiting"|"already-registered"|"already-open", ...}
-//              → 第二条: {ok:true, action:"login", phase:"final",   pairingCode, status:"connected"|"pending"|"already-open", ...}
+//              → 第一条: {ok:true, action:"login", phase:"pairing", pairingCode, status:"waiting"|"already-registered"|"already-open"}
+//              → 第二条: {ok:true, action:"login", phase:"final",   pairingCode, status:"connected"|"pending"|"already-open"}
 // - status:    {action:"status", phoneNumber:"12345678901"}
 // - list:      {action:"list"}
 // - disconnect:{action:"disconnect", phoneNumber:"12345678901"}
@@ -12,7 +12,6 @@
 import { WebSocketServer } from "ws";
 import NodeCache from "node-cache";
 import fs from "fs";
-import path from "path";
 import {
   default as makeWASocket,
   fetchLatestBaileysVersion,
@@ -20,9 +19,9 @@ import {
   useMultiFileAuthState,
   Browsers,
   DisconnectReason,
-} from "./baileys/lib/index.js";
+} from "./baileys/lib/index.js"; // 如果用 npm 版：改为 from "baileys"
 
-// ========== 轻量 console logger（兼容 .child()）==========
+// ====== 轻量 console logger（兼容 .child()），避免中文乱码 ======
 const ConsoleLogger = {
   level: "info",
   child() { return this; },
@@ -33,7 +32,7 @@ const ConsoleLogger = {
   trace: (...a) => console.debug(...a),
 };
 
-// Baileys 推荐：缓存消息重试计数
+// Baileys 建议：消息重试计数缓存
 const msgRetryCounterCache = new NodeCache();
 
 /* -------------------- 工具函数 -------------------- */
@@ -53,7 +52,7 @@ function sendJSON(ws, obj) {
   }
 }
 
-// 等待“可以触发配对码”的时机：connecting/qr/open（官方建议）
+// 官方建议：等待“可触发配对码”的时机（connecting/qr/open）
 function waitPairingTrigger(sock, timeoutMs = 15000) {
   return new Promise((resolve, reject) => {
     let done = false;
@@ -79,14 +78,14 @@ function waitPairingTrigger(sock, timeoutMs = 15000) {
         try { sock.ev.off("connection.update", onU); } catch {}
         resolve("ready");
       }
-      // close -> 等待超时，给自动重连机会
+      // close -> 不立即失败，留给超时
     };
 
     sock.ev.on("connection.update", onU);
   });
 }
 
-// 等待底层 ws OPEN，避免 428
+// 避免 428：底层 ws 必须 OPEN
 function waitWsOpen(sock, timeoutMs = 10000) {
   return new Promise((resolve, reject) => {
     try {
@@ -94,7 +93,6 @@ function waitWsOpen(sock, timeoutMs = 10000) {
       const onOpen = () => { cleanup(); resolve(); };
       const onClose = () => { cleanup(); reject(new Error("WS closed before open")); };
       const onError = (err) => { cleanup(); reject(err || new Error("WS error before open")); };
-
       const timer = setTimeout(() => { cleanup(); reject(new Error("WS open timeout")); }, timeoutMs);
 
       function cleanup() {
@@ -103,56 +101,41 @@ function waitWsOpen(sock, timeoutMs = 10000) {
         try { sock.ws?.off?.("close", onClose); } catch {}
         try { sock.ws?.off?.("error", onError); } catch {}
       }
-
       sock.ws?.on?.("open", onOpen);
       sock.ws?.on?.("close", onClose);
       sock.ws?.on?.("error", onError);
-    } catch (e) {
-      reject(e);
-    }
+    } catch (e) { reject(e); }
   });
 }
 
-// 等待 open 或超时，返回 "connected"|"pending"|"already-open"
-function waitForOpenOnce(sock, waitMs) {
+// session 级别的“等待 open”，兼容重建 socket 的场景
+function waitSessionOpen(session, waitMs = 30000) {
   return new Promise((resolve) => {
-    let done = false;
-    const timer = setTimeout(() => {
-      if (done) return;
-      done = true;
-      try { sock.ev.off("connection.update", onUpdate); } catch {}
-      resolve("pending");
-    }, waitMs);
-
-    const onUpdate = (u) => {
-      if (done) return;
-      if (u?.connection === "open") {
-        done = true;
-        clearTimeout(timer);
-        try { sock.ev.off("connection.update", onUpdate); } catch {}
-        resolve("connected");
-      }
+    const end = Date.now() + waitMs;
+    const tick = () => {
+      if (session.lastConnection === "open") return resolve("connected");
+      if (Date.now() >= end)                 return resolve("pending");
+      setTimeout(tick, 250);
     };
-    sock.ev.on("connection.update", onUpdate);
+    tick();
   });
 }
 
-// 清理 AUTH/<phone> 目录
+// 清空 AUTH 目录
 function clearAuthDir(dir) {
   try { fs.rmSync(dir, { recursive: true, force: true }); } catch {}
   try { fs.mkdirSync(dir, { recursive: true }); } catch {}
 }
 
 // 单号互斥，避免 AUTH/<phone> 目录竞态
-const phoneLocks = new Map(); // phone -> Promise
+const phoneLocks = new Map();
 async function withPhoneLock(phone, fn) {
   const prev = phoneLocks.get(phone) || Promise.resolve();
   let release;
   const next = new Promise((r) => (release = r));
   phoneLocks.set(phone, prev.then(() => next));
-  try {
-    return await fn();
-  } finally {
+  try { return await fn(); }
+  finally {
     release();
     if (phoneLocks.get(phone) === next) phoneLocks.delete(phone);
   }
@@ -160,7 +143,7 @@ async function withPhoneLock(phone, fn) {
 
 /* -------------------- 会话管理 -------------------- */
 
-const sessions = new Map(); // phoneNumberDigits -> Session
+const sessions = new Map(); // phoneDigits -> Session
 
 function sessionSummary(s) {
   return {
@@ -177,9 +160,7 @@ function sessionSummary(s) {
 async function ensureSession(phoneDigits) {
   phoneDigits = normalizeE164Digits(phoneDigits);
 
-  if (sessions.has(phoneDigits)) {
-    return sessions.get(phoneDigits);
-  }
+  if (sessions.has(phoneDigits)) return sessions.get(phoneDigits);
 
   return await withPhoneLock(phoneDigits, async () => {
     if (sessions.has(phoneDigits)) return sessions.get(phoneDigits);
@@ -190,7 +171,7 @@ async function ensureSession(phoneDigits) {
 
     const sock = makeWASocket({
       version,
-      logger: ConsoleLogger, // 避免乱码
+      logger: ConsoleLogger,
       printQRInTerminal: false,
       browser: Browsers.macOS("Safari"),
       auth: {
@@ -215,43 +196,79 @@ async function ensureSession(phoneDigits) {
 
     sessions.set(phoneDigits, session);
 
-    // 自动保存凭据
     sock.ev.on("creds.update", async () => {
       try { await saveCreds(); } catch {}
       session.registered = !!sock.authState?.creds?.registered;
       session.updatedAt = Date.now();
     });
 
-    // 连接状态与重连策略
     sock.ev.process(async (events) => {
-      if (events["connection.update"]) {
-        const update = events["connection.update"];
-        const { connection, lastDisconnect } = update;
+      if (!events["connection.update"]) return;
+      const update = events["connection.update"];
+      const { connection, lastDisconnect } = update;
 
-        if (connection) {
-          session.lastConnection = connection;
-          session.updatedAt = Date.now();
-        }
+      if (connection) {
+        session.lastConnection = connection;
+        session.updatedAt = Date.now();
+      }
 
-        if (connection === "open") {
+      if (connection === "open") {
+        session.retriesLeft = 5;
+        session.registered = !!sock.authState?.creds?.registered;
+        console.log(`[${phoneDigits}] 连接已建立`);
+      }
+
+      if (connection === "close") {
+        const code = lastDisconnect?.error?.output?.statusCode
+          ?? lastDisconnect?.error?.statusCode;
+        const loggedOut = code === DisconnectReason.loggedOut;
+
+                 // 只有官方的 restartRequired 才是配对成功后的正常重启
+         const restartRequired = code === DisconnectReason.restartRequired;
+
+        if (restartRequired) {
+          console.log(`[${phoneDigits}] 配对成功！WhatsApp 要求重启连接 (code=${code})`);
+          // 配对成功，重新启用自动重连
+          session.autoReconnect = true;
           session.retriesLeft = 5;
-          session.registered = !!sock.authState?.creds?.registered;
-          console.log(`[${phoneDigits}] 连接已建立`);
+          recreateSocket(session).catch((e) => {
+            console.error(`[${phoneDigits}] 配对后重启失败`, e);
+          });
+          return;
         }
 
-        if (connection === "close") {
-          const code = lastDisconnect?.error?.output?.statusCode;
-          const loggedOut = code === DisconnectReason.loggedOut;
+        if (loggedOut) {
+          console.warn(`[${phoneDigits}] 已登出（401），停止自动重连，等待 login 重新配对`);
+          session.autoReconnect = false;
+          session.retriesLeft   = 0;
+          return;
+        }
 
-          console.warn(`[${phoneDigits}] 连接关闭 code=${code} loggedOut=${loggedOut}`);
-
-          if (loggedOut) {
-            // 已登出：停止自动重连，等待 login 触发“清空并重建”
-            session.autoReconnect = false;
-            session.retriesLeft = 0;
-          } else if (session.autoReconnect && session.retriesLeft > 0) {
+        // 配对阶段的连接错误：更谨慎处理
+        console.warn(`[${phoneDigits}] 连接关闭 (code=${code})`);
+        
+        // 如果是配对阶段（有配对码但未注册），给更多耐心
+        const hasPairingCode = !!session.sock.authState?.creds?.pairingCode;
+        const isUnregistered = !session.registered;
+        
+        if (hasPairingCode && isUnregistered) {
+          console.log(`[${phoneDigits}] 配对阶段连接断开，等待用户输入配对码...`);
+          // 配对阶段不急于重连，给用户时间输入配对码
+          if (session.autoReconnect && session.retriesLeft > 0) {
             session.retriesLeft -= 1;
-            const delay = 3000;
+            console.warn(`[${phoneDigits}] 配对阶段稍后重连，剩余重试 ${session.retriesLeft} 次`);
+            setTimeout(() => {
+              if (sessions.get(phoneDigits) === session && session.autoReconnect) {
+                recreateSocket(session).catch((e) => {
+                  console.error(`[${phoneDigits}] 配对阶段重连失败`, e);
+                });
+              }
+            }, 10000); // 配对阶段等待更久
+          }
+        } else {
+          // 正常重连逻辑
+          if (session.autoReconnect && session.retriesLeft > 0) {
+            session.retriesLeft -= 1;
             console.warn(`[${phoneDigits}] 准备重连，剩余重试 ${session.retriesLeft} 次`);
             setTimeout(() => {
               if (sessions.get(phoneDigits) === session && session.autoReconnect) {
@@ -259,7 +276,7 @@ async function ensureSession(phoneDigits) {
                   console.error(`[${phoneDigits}] 重连失败`, e);
                 });
               }
-            }, delay);
+            }, 3000);
           }
         }
       }
@@ -272,9 +289,7 @@ async function ensureSession(phoneDigits) {
 async function recreateSocket(session, { fresh = false } = {}) {
   const { phoneNumber, authPath } = session;
 
-  if (fresh) {
-    clearAuthDir(authPath);
-  }
+  if (fresh) clearAuthDir(authPath);
 
   const { state, saveCreds } = await useMultiFileAuthState(authPath);
   const { version } = await fetchLatestBaileysVersion();
@@ -308,40 +323,57 @@ async function recreateSocket(session, { fresh = false } = {}) {
   });
 
   sock.ev.process(async (events) => {
-    if (events["connection.update"]) {
-      const update = events["connection.update"];
-      const { connection, lastDisconnect } = update;
+    if (!events["connection.update"]) return;
+    const update = events["connection.update"];
+    const { connection, lastDisconnect } = update;
 
-      if (connection) {
-        session.lastConnection = connection;
-        session.updatedAt = Date.now();
-      }
+    if (connection) {
+      session.lastConnection = connection;
+      session.updatedAt = Date.now();
+    }
 
-      if (connection === "open") {
+    if (connection === "open") {
+      session.retriesLeft = 5;
+      session.registered = !!sock.authState?.creds?.registered;
+      console.log(`[${phoneNumber}] 重连成功`);
+    }
+
+    if (connection === "close") {
+      const code = lastDisconnect?.error?.output?.statusCode
+        ?? lastDisconnect?.error?.statusCode;
+      const loggedOut = code === DisconnectReason.loggedOut;
+
+             const restartRequired = code === DisconnectReason.restartRequired;
+
+      if (restartRequired) {
+        console.log(`[${phoneNumber}] 配对成功！WhatsApp 要求重启连接 (code=${code})`);
+        // 配对成功，重新启用自动重连
+        session.autoReconnect = true;
         session.retriesLeft = 5;
-        session.registered = !!sock.authState?.creds?.registered;
-        console.log(`[${phoneNumber}] 重连成功`);
+        recreateSocket(session).catch((e) => {
+          console.error(`[${phoneNumber}] 配对后重启失败`, e);
+        });
+        return;
       }
 
-      if (connection === "close") {
-        const code = lastDisconnect?.error?.output?.statusCode;
-        const loggedOut = code === DisconnectReason.loggedOut;
+      if (loggedOut) {
+        console.warn(`[${phoneNumber}] 已登出（401），停止自动重连，等待 login 重新配对`);
+        session.autoReconnect = false;
+        session.retriesLeft   = 0;
+        return;
+      }
 
-        console.warn(`[${phoneNumber}] 重连后连接关闭 code=${code} loggedOut=${loggedOut}`);
-
-        if (loggedOut) {
-          session.autoReconnect = false;
-          session.retriesLeft = 0;
-        } else if (session.autoReconnect && session.retriesLeft > 0) {
-          session.retriesLeft -= 1;
-          setTimeout(() => {
-            if (sessions.get(phoneNumber) === session && session.autoReconnect) {
-              recreateSocket(session).catch((e) => {
-                console.error(`[${phoneNumber}] 再次重连失败`, e);
-              });
-            }
-          }, 3000);
-        }
+      // 其他连接错误：按正常重连逻辑处理
+      console.warn(`[${phoneNumber}] 重连后连接关闭 (code=${code})`);
+      if (session.autoReconnect && session.retriesLeft > 0) {
+        session.retriesLeft -= 1;
+        setTimeout(() => {
+          if (sessions.get(phoneNumber) === session && session.autoReconnect) {
+            recreateSocket(session).catch((e) => {
+              console.error(`[${phoneNumber}] 再次重连失败`, e);
+            });
+          }
+        }, 3000);
       }
     }
   });
@@ -356,35 +388,31 @@ const wss = new WebSocketServer({ port: PORT });
 console.log(`WS server listening on ws://localhost:${PORT}`);
 
 wss.on("connection", (ws) => {
-  // 初始问候
   sendJSON(ws, { ok: true, hello: "ready", actions: ["login", "status", "list", "disconnect", "reconnect"] });
 
   ws.on("message", async (raw) => {
     let msg;
-    try {
-      msg = JSON.parse(raw.toString());
-    } catch {
-      return sendJSON(ws, { ok: false, error: "invalid JSON" });
-    }
+    try { msg = JSON.parse(raw.toString()); }
+    catch { return sendJSON(ws, { ok: false, error: "invalid JSON" }); }
 
     const { action } = msg || {};
     if (!action) return sendJSON(ws, { ok: false, error: "missing action" });
 
     try {
-      /* ---------- login：两阶段（官方建议的触发＋WS open 双条件） ---------- */
+      /* ---------- login：两阶段（官方触发 + ws open + 重启处理） ---------- */
       if (action === "login") {
         const { phoneNumber: pn, waitMs = 30000, requestId } = msg;
         const phoneDigits = normalizeE164Digits(pn);
 
         let session = await ensureSession(phoneDigits);
 
-        // 若上次是 401 登出，先清空目录并新建“干净会话”
+        // 若上次明确登出（401），先清空 AUTH 并重建干净会话
         if (session.lastConnection === "close" && session.retriesLeft === 0 && session.autoReconnect === false) {
-          console.warn(`[${phoneDigits}] 检测到上次是 loggedOut，清空 AUTH 并重建会话`);
+          console.warn(`[${phoneDigits}] 检测到上次是 loggedOut，清空 AUTH 并重建`);
           await recreateSocket(session, { fresh: true });
         }
 
-        // 先等待“可请求配对码”的时机（connecting/qr/open）
+        // 等待“可请求配对”的时机：connecting/qr/open
         let trigger;
         try {
           trigger = await waitPairingTrigger(session.sock, 15000); // "ready" | "already-open"
@@ -397,14 +425,13 @@ wss.on("connection", (ws) => {
           });
         }
 
-        // 再确保底层 ws 已 OPEN（避免 428）
+        // 确保底层 ws OPEN（避免 428）
         try {
           await waitWsOpen(session.sock, 10000);
         } catch (err) {
-          // 如果 ws 没 open，可能因为旧凭据导致 401；清空并重建后再试一次
-          console.warn(`[${phoneDigits}] ws 未 OPEN，尝试清空 AUTH 并重建会话再试`);
+          // 可能是旧凭据问题，清空后再试一次
+          console.warn(`[${phoneDigits}] ws 未 OPEN，尝试清空 AUTH 并重建后再试`);
           await recreateSocket(session, { fresh: true });
-          // 重新等待触发
           trigger = await waitPairingTrigger(session.sock, 15000).catch((e) => {
             throw new Error("pairing-trigger-after-fresh: " + (e?.message || String(e)));
           });
@@ -413,21 +440,41 @@ wss.on("connection", (ws) => {
 
         session.registered = !!session.sock.authState?.creds?.registered;
 
-        let pairingCode = null;
-        if (!session.registered && trigger !== "already-open") {
-          try {
-            pairingCode = await session.sock.requestPairingCode(phoneDigits);
-            console.log(`[${phoneDigits}] 配对码: ${pairingCode}`);
-          } catch (e) {
-            console.error(`[${phoneDigits}] 生成配对码失败`, e);
-            return sendJSON(ws, {
-              ok: false,
-              action: "login",
-              phoneNumber: phoneDigits,
-              error: "pairing-failed: " + (e?.message || String(e)),
-            });
-          }
-        }
+                 // 未注册才申请配对码；已 open 则无需
+         let pairingCode = null;
+         if (!session.registered && trigger !== "already-open") {
+           try {
+             console.log(`[${phoneDigits}] 正在请求配对码...`);
+             pairingCode = await session.sock.requestPairingCode(phoneDigits);
+             console.log(`[${phoneDigits}] 配对码: ${pairingCode}`);
+             
+             // 配对请求发送后，暂时禁用自动重连，让 Baileys 自然处理配对流程
+             session.autoReconnect = false;
+             await new Promise(resolve => setTimeout(resolve, 2000));
+             console.log(`[${phoneDigits}] 配对码已发送，已暂停自动重连，等待配对完成...`);
+           } catch (e) {
+             // 检查是否为 428 错误但配对码可能已生成
+             const is428 = e?.output?.statusCode === 428 || e?.statusCode === 428;
+             if (is428 && session.sock.authState?.creds?.pairingCode) {
+               // 428 错误但配对码已生成，这是可接受的
+               pairingCode = session.sock.authState.creds.pairingCode;
+               console.log(`[${phoneDigits}] 配对码 (428容错): ${pairingCode}`);
+               console.log(`[${phoneDigits}] 注意：requestPairingCode 出现 428 错误，但配对码已生成`);
+               // 428 容错情况下也暂停自动重连
+               session.autoReconnect = false;
+             } else {
+               console.error(`[${phoneDigits}] 生成配对码失败`, e);
+               // 配对失败，暂停自动重连
+               session.autoReconnect = false;
+               return sendJSON(ws, {
+                 ok: false,
+                 action: "login",
+                 phoneNumber: phoneDigits,
+                 error: "pairing-failed: " + (e?.message || String(e)),
+               });
+             }
+           }
+         }
 
         // 第一条：立即回配对码/状态
         sendJSON(ws, {
@@ -440,10 +487,10 @@ wss.on("connection", (ws) => {
           requestId,
         });
 
-        // 第二条：等待最多 waitMs 看是否 open（配对成功）
+        // 第二条：等待会话 open（即便中间经历 recreate）
         const status = trigger === "already-open"
           ? "already-open"
-          : await waitForOpenOnce(session.sock, waitMs);
+          : await waitSessionOpen(session, waitMs);
 
         sendJSON(ws, {
           ok: true,
@@ -475,7 +522,6 @@ wss.on("connection", (ws) => {
           });
         }
 
-        // 若内存中没有会话，读本地凭据判断是否已注册
         const { state } = await useMultiFileAuthState(`AUTH/${phoneDigits}`);
         return sendJSON(ws, {
           ok: true,
@@ -486,13 +532,13 @@ wss.on("connection", (ws) => {
         });
       }
 
-      /* ---------- list：列出所有在线会话 ---------- */
+      /* ---------- list：列出所有会话摘要 ---------- */
       if (action === "list") {
         const connections = Array.from(sessions.values()).map(sessionSummary);
         return sendJSON(ws, { ok: true, action: "list", connections });
       }
 
-      /* ---------- disconnect：手动断开某个号码 ---------- */
+      /* ---------- disconnect：手动断开 ---------- */
       if (action === "disconnect") {
         const { phoneNumber: pn } = msg;
         const phoneDigits = normalizeE164Digits(pn);
@@ -502,7 +548,7 @@ wss.on("connection", (ws) => {
         }
 
         const s = sessions.get(phoneDigits);
-        s.autoReconnect = false; // 禁止自动重连
+        s.autoReconnect = false;
         try { s.sock.ev.removeAllListeners(); } catch {}
         try { await s.sock.ws?.close?.(); } catch {}
         sessions.delete(phoneDigits);
@@ -510,7 +556,7 @@ wss.on("connection", (ws) => {
         return sendJSON(ws, { ok: true, action: "disconnect", phoneNumber: phoneDigits });
       }
 
-      /* ---------- reconnect：重建连接（若无内存会话则新建） ---------- */
+      /* ---------- reconnect：重建连接（无会话则新建） ---------- */
       if (action === "reconnect") {
         const { phoneNumber: pn } = msg;
         const phoneDigits = normalizeE164Digits(pn);
@@ -519,24 +565,15 @@ wss.on("connection", (ws) => {
           const s = sessions.get(phoneDigits);
           s.autoReconnect = true;
           await recreateSocket(s);
-          let status = "connecting";
-          try {
-            const r = await waitForOpenOnce(s.sock, 5000);
-            status = r === "connected" ? "connected" : "pending";
-          } catch {}
+          const status = await waitSessionOpen(s, 5000);
           return sendJSON(ws, { ok: true, action: "reconnect", phoneNumber: phoneDigits, status });
         } else {
           const s = await ensureSession(phoneDigits);
-          let status = "connecting";
-          try {
-            const r = await waitForOpenOnce(s.sock, 5000);
-            status = r === "connected" ? "connected" : "pending";
-          } catch {}
+          const status = await waitSessionOpen(s, 5000);
           return sendJSON(ws, { ok: true, action: "reconnect", phoneNumber: phoneDigits, status });
         }
       }
 
-      /* ---------- 未知动作 ---------- */
       return sendJSON(ws, { ok: false, error: "unknown action" });
     } catch (e) {
       console.error("WS action error:", e);

@@ -434,7 +434,7 @@ if (process.argv.includes('--help') || process.argv.includes('-h')) {
   logout  - 登出并清理认证
 
 🚀 使用示例:
-  node account_manager_server.js action=login number=66961687880 timeout=60
+  node account_manager_server.js action=login number=8613760212132 timeout=60
   node account_manager_server.js action=login number=66961687880 timeout=60 clean=true
   node account_manager_server.js action=status number=66961687880
   node account_manager_server.js action=logout number=66961687880

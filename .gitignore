@@ -28,3 +28,4 @@ AUTH/*
 
 # Store data
 store.json
+/__pycache__

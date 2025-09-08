@@ -1,6 +1,6 @@
 // 🚀 WhatsApp 账号管理器 - 命令行参数版本
 // 基于已验证可行的 example.js 逐步开发
-// 
+//
 // 使用方法:
 // node account_manager_server.js action=login number=66961687880 timeout=60
 // node account_manager_server.js action=status number=66961687880
@@ -60,7 +60,7 @@ async function loginAction(phoneNumber, timeoutSeconds = 60, shouldClean = false
 		console.log("=====================================");
 
 		const authPath = `AUTH/cmd_${phoneNumber}`;
-		
+
 		// 🧹 如果启用清理模式，先清理认证状态
 		if (shouldClean && fs.existsSync(authPath)) {
 			console.log("🧹 正在清理可能污染的认证状态...");
@@ -74,7 +74,7 @@ async function loginAction(phoneNumber, timeoutSeconds = 60, shouldClean = false
 		console.log("正在使用 WhatsApp v" + version.join(".") + ", 是最新版本: " + isLatest);
 
 		console.log("🔌 创建 WhatsApp socket...");
-		
+
 		// 🔍 添加详细诊断信息
 		console.log("🔍 诊断信息:");
 		console.log("   Auth creds exist:", !!state.creds);
@@ -82,7 +82,7 @@ async function loginAction(phoneNumber, timeoutSeconds = 60, shouldClean = false
 		console.log("   Registered:", !!state?.creds?.registered);
 		console.log("   Version:", version);
 		console.log("   Auth path:", authPath);
-		
+
 		const sock = makeWASocket({
 			version,
 			logger: P, // 保持静默日志，和 example.js 一致
@@ -94,7 +94,7 @@ async function loginAction(phoneNumber, timeoutSeconds = 60, shouldClean = false
 			},
 			msgRetryCounterCache,
 		});
-		
+
 		console.log("✅ Socket 创建完成");
 		console.log("🔗 初始连接状态:", sock.ws?.readyState === 1 ? "OPEN" : "NOT_OPEN");
 
@@ -124,26 +124,26 @@ async function loginAction(phoneNumber, timeoutSeconds = 60, shouldClean = false
 				console.log("🔗 配对码生成后连接状态:", sock.ws?.readyState === 1 ? "OPEN" : "NOT_OPEN");
 				console.log("⏳ 等待用户在 WhatsApp 中输入配对码...");
 				console.log("┌─────────────────────────────────────────┐");
-				console.log(`│           配对码: ${code}             │`);
+				console.log(`│           pairCode:${code}             │`);
 				console.log("└─────────────────────────────────────────┘");
 			} catch (error) {
 				console.error("❌ 配对码生成失败:", error.message);
 				console.error("🔍 错误详情:", error);
-				
+
 				// 🔥 检查是否是状态污染问题，尝试清理重试
 				if (error.message.includes("Connection Closed") || error.message.includes("Connection Failure")) {
 					console.log("🧹 检测到连接问题，尝试清理 AUTH 状态并重试...");
-					
+
 					// 清理 AUTH 目录
 					if (fs.existsSync(authPath)) {
 						fs.rmSync(authPath, { recursive: true, force: true });
 						console.log("✅ AUTH 状态已清理");
 					}
-					
+
 					// 等待一段时间后重试
 					console.log("⏳ 等待 5 秒后重试...");
 					await new Promise(resolve => setTimeout(resolve, 5000));
-					
+
 					console.log("🔄 正在重试配对...");
 					const result = {
 						success: false,
@@ -154,7 +154,7 @@ async function loginAction(phoneNumber, timeoutSeconds = 60, shouldClean = false
 					pairingResult(result);
 					return result;
 				}
-				
+
 				const result = {
 					success: false,
 					action: 'login',
@@ -288,7 +288,7 @@ async function statusAction(phoneNumber) {
 		console.log(`📱 手机号: ${phoneNumber}`);
 
 		const authPath = `AUTH/cmd_${phoneNumber}`;
-		
+
 		if (!fs.existsSync(authPath)) {
 			return {
 				success: true,
@@ -304,7 +304,7 @@ async function statusAction(phoneNumber) {
 		const registered = !!state?.creds?.registered;
 
 		console.log("📋 已注册状态:", registered);
-		
+
 		return {
 			success: true,
 			action: 'status',
@@ -332,7 +332,7 @@ async function logoutAction(phoneNumber) {
 		console.log(`📱 手机号: ${phoneNumber}`);
 
 		const authPath = `AUTH/cmd_${phoneNumber}`;
-		
+
 		if (fs.existsSync(authPath)) {
 			fs.rmSync(authPath, { recursive: true, force: true });
 			console.log("✅ 认证文件已清理");

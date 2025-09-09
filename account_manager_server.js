@@ -184,53 +184,25 @@ async function loginAction(phoneNumber, timeoutSeconds = 60, shouldClean = false
 				}
 
 				if (connection === "close") {
-					const code = lastDisconnect?.error?.output?.statusCode || lastDisconnect?.error?.statusCode;
-					const loggedOut = code === DisconnectReason.loggedOut;
-					const restartRequired =lastDisconnect && lastDisconnect.error;
-
-					console.log("❌ 连接关闭:");
-					console.log("   错误代码:", code);
-					console.log("   loggedOut:", loggedOut);
-					console.log("   restartRequired:", restartRequired);
-					console.log("   错误详情:", lastDisconnect?.error);
-
-					if (restartRequired) {
-						console.log("✅ 配对成功！WhatsApp 要求重启连接，这是正常的");
-						console.log("🔄 等待自动重新连接...");
-					} else if (loggedOut) {
-						console.log("🚪 账号已登出，停止重连");
+					console.log("❌ 连接关闭:", lastDisconnect?.error);
+					if (
+						lastDisconnect &&
+						lastDisconnect.error
+						// &&
+						// lastDisconnect.error.output &&
+						// lastDisconnect.error.output.statusCode !== DisconnectReason.loggedOut
+					) {
+						console.log("🔄 连接已断开，正在重新连接...");
+						// 注释掉重连调用，让配对过程自然完成
+						// start(); 
+					} else {
+						console.log("🛑 连接已关闭，您已登出。");
 						pairingResult({
 							success: false,
 							action: 'login',
 							phoneNumber,
-							error: '账号已登出'
+							error: '连接已关闭'
 						});
-					} else {
-						const shouldReconnect = lastDisconnect && lastDisconnect.error && lastDisconnect.error.output && lastDisconnect.error.output.statusCode !== DisconnectReason.loggedOut;
-
-						if (shouldReconnect) {
-							console.log("🔄 连接已断开，尝试重新连接... 剩余重试:" + maxRetries);
-							maxRetries -= 1;
-							if (maxRetries < 0) {
-								console.log("❌ 重试次数已用完，退出");
-								pairingResult({
-									success: false,
-									action: 'login',
-									phoneNumber,
-									error: '重试次数已用完'
-								});
-							} else {
-								setTimeout(() => loginAction(phoneNumber, timeoutSeconds), 5000);
-							}
-						} else {
-							console.log("🛑 连接已关闭，您已登出。");
-							pairingResult({
-								success: false,
-								action: 'login',
-								phoneNumber,
-								error: '连接已关闭'
-							});
-						}
 					}
 				} else if (connection === "open") {
 					console.log("✅ WhatsApp 连接已建立！");
@@ -435,7 +407,7 @@ if (process.argv.includes('--help') || process.argv.includes('-h')) {
 
 🚀 使用示例:
   node account_manager_server.js action=login number=8613760212132 timeout=60
-  node account_manager_server.js action=login number=447999803105 timeout=60 clean=true
+  node account_manager_server.js action=login number=66952407035 timeout=90 clean=true
   node account_manager_server.js action=status number=66961687880
   node account_manager_server.js action=logout number=66961687880
 

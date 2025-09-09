@@ -8,7 +8,7 @@ import makeWASocket, {
 import pino from "pino";
 import NodeCache from "node-cache";
 import readline from "readline";
-let maxRetries = 5;
+// Removed maxRetries - using simple reconnection like mini_example
 
 const logger = pino({
 	timestamp: () => `,"time":"${new Date().toJSON()}"`,
@@ -82,36 +82,18 @@ async function start() {
 			}
 
 			if (connection === "close") {
-				const code = lastDisconnect?.error?.output?.statusCode || lastDisconnect?.error?.statusCode;
-				const loggedOut = code === DisconnectReason.loggedOut;
-				const restartRequired = code === DisconnectReason.restartRequired;
-
-				console.log("❌ 连接关闭:");
-				console.log("   错误代码:", code);
-				console.log("   loggedOut:", loggedOut);
-				console.log("   restartRequired:", restartRequired);
-				console.log("   错误详情:", lastDisconnect?.error);
-
-				if (restartRequired) {
-					console.log("✅ 配对成功！WhatsApp 要求重启连接，这是正常的");
-					console.log("🔄 等待自动重新连接...");
-				} else if (loggedOut) {
-					console.log("🚪 账号已登出，停止重连");
+				console.log("❌ 连接关闭:", lastDisconnect?.error);
+				if (
+					lastDisconnect &&
+					lastDisconnect.error
+					// &&
+					// lastDisconnect.error.output &&
+					// lastDisconnect.error.output.statusCode !== DisconnectReason.loggedOut
+				) {
+					console.log("🔄 连接已断开，正在重新连接...");
+					start();
 				} else {
-					const shouldReconnect = lastDisconnect && lastDisconnect.error
-						// && lastDisconnect.error.output && lastDisconnect.error.output.statusCode !== DisconnectReason.loggedOut;
-
-					if (shouldReconnect) {
-						console.log("🔄 连接已断开，尝试重新连接... 剩余重试:" + maxRetries);
-						maxRetries-=1
-						if(maxRetries<0){
-							console.log("❌ 重试次数已用完，退出");
-							process.exit(1);
-						}
-						setTimeout(() => start(), 5000); // 5秒后重新连接
-					} else {
-						console.log("🛑 连接已关闭，您已登出。");
-					}
+					console.log("🛑 连接已关闭，您已登出。");
 				}
 			} else if (connection === "open") {
 				console.log("✅ WhatsApp 连接已建立！");

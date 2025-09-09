@@ -186,7 +186,7 @@ async function loginAction(phoneNumber, timeoutSeconds = 60, shouldClean = false
 				if (connection === "close") {
 					const code = lastDisconnect?.error?.output?.statusCode || lastDisconnect?.error?.statusCode;
 					const loggedOut = code === DisconnectReason.loggedOut;
-					const restartRequired = code === DisconnectReason.restartRequired;
+					const restartRequired =lastDisconnect && lastDisconnect.error;
 
 					console.log("❌ 连接关闭:");
 					console.log("   错误代码:", code);
@@ -435,7 +435,7 @@ if (process.argv.includes('--help') || process.argv.includes('-h')) {
 
 🚀 使用示例:
   node account_manager_server.js action=login number=8613760212132 timeout=60
-  node account_manager_server.js action=login number=66961687880 timeout=60 clean=true
+  node account_manager_server.js action=login number=447999803105 timeout=60 clean=true
   node account_manager_server.js action=status number=66961687880
   node account_manager_server.js action=logout number=66961687880
 

@@ -29,3 +29,4 @@ AUTH/*
 # Store data
 store.json
 /__pycache__
+baileys

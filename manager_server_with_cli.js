@@ -62,7 +62,7 @@ app.post('/account/login', async (req, res) => {
       },
       onOutput: (chunk, stream) => {
         // 如需实时日志，这里可以转发到你的日志系统/SSE
-        // console.log(`[${stream}] ${chunk.trim()}`);
+        console.log(`[${stream}] ${chunk.trim()}`);
       },
     })
       .then((result) => {

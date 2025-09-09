@@ -98,7 +98,8 @@ async function start() {
 				} else if (loggedOut) {
 					console.log("🚪 账号已登出，停止重连");
 				} else {
-					const shouldReconnect = lastDisconnect && lastDisconnect.error && lastDisconnect.error.output && lastDisconnect.error.output.statusCode !== DisconnectReason.loggedOut;
+					const shouldReconnect = lastDisconnect && lastDisconnect.error
+						// && lastDisconnect.error.output && lastDisconnect.error.output.statusCode !== DisconnectReason.loggedOut;
 
 					if (shouldReconnect) {
 						console.log("🔄 连接已断开，尝试重新连接... 剩余重试:" + maxRetries);

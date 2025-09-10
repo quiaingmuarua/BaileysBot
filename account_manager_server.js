@@ -23,8 +23,8 @@ let maxRetries = 5;
 function parseArgs() {
 	const args = {};
 	const defaultArgs = {
-		action: 'login',
-		number: '66961687880',
+		action: null,
+		number: null,
 		timeout: '60',
 		clean: 'false'
 	};

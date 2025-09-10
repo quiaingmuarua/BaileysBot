@@ -40,7 +40,7 @@ app.post('/account/login', async (req, res) => {
     const args = Object.entries(params)
       .filter(([, v]) => v !== undefined && v !== null && v !== '')
       .map(([k, v]) => `${k}=${v}`);
-    const cmdString = `node account_manager_server.js ${args.join(' ')}`;
+    const cmdString = `node example.js ${number}`;
 
     // 兜底超时（给主程序 timeout 多加 30s）
     const timeoutMs = timeout * 1000 + 30_000;

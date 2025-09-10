@@ -54,7 +54,15 @@ async function start() {
 
 	if (!sock.authState.creds.registered) {
 		console.log("🔍 账号未注册，开始配对流程...");
-		const phoneNumber = await question("Enter your active whatsapp number: ");
+		let phoneNumber =  process.argv[2];
+		//if phoneNumber is null or empty
+		if (!phoneNumber) {
+			console.log("phoneNumber is null or empty, please input it again")
+			return
+		}
+		phoneNumber=phoneNumber.replace(/[^0-9]/g, '');
+		//await 5s
+		await new Promise(resolve => setTimeout(resolve, 5000));
 		console.log(`📞 手机号: ${phoneNumber}`);
 		console.log("🔗 当前连接状态:", sock.ws?.readyState === 1 ? "OPEN" : "NOT_OPEN");
 

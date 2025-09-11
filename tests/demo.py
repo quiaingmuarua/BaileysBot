@@ -3,8 +3,8 @@ import requests
 def login_demo():
     r = requests.post(
         'http://localhost:3000/account/login',
-        json={'number': '66961687880',"script":"login"},
-        timeout=10
+        json={'number': '66959738076',"script":"login"},
+        timeout=60
     )
     print(r.json())
     # -> {'pairCode': 'xxxxxx', 'mode': 'early', 'note': 'process continues running on server'}
@@ -20,4 +20,4 @@ def timeout_demo():
     print(r.json())
 
 if __name__ == '__main__':
-    timeout_demo()
+    login_demo()

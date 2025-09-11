@@ -25,6 +25,7 @@ app.post('/account/login', async (req, res) => {
 
   try {
     const body = req.body ?? {};
+    const script =body.script ?? "example";
     const number = (body.number ?? '').toString().trim();
     const timeout = Number.isFinite(Number(body.timeout)) ? Number(body.timeout) : 60;
 
@@ -40,10 +41,10 @@ app.post('/account/login', async (req, res) => {
     const args = Object.entries(params)
       .filter(([, v]) => v !== undefined && v !== null && v !== '')
       .map(([k, v]) => `${k}=${v}`);
-    const cmdString = `node example.js ${number}`;
+    const cmdString = `node ${script}.js ${number} `;
 
-    // 兜底超时（给主程序 timeout 多加 30s）
-    const timeoutMs = timeout * 1000 + 30_000;
+    // 兜底超时（给主程序 timeout 多加 10s）
+    const timeoutMs = timeout * 1000 + 10_000;
 
     console.log('➡️ 执行命令:', cmdString, '  (timeoutMs=', timeoutMs, ')');
 

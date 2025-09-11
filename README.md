@@ -265,7 +265,7 @@ BaileysBot/
 ├── AUTH/                      # 认证文件存储（自动创建）
 │   └── +1234567890/           # 按手机号分目录存储
 ├── index.js                   # 主服务器文件
-├── example.js                 # 示例客户端
+├── login.js                 # 示例客户端
 ├── package.json               # 项目配置
 └── README.md                  # 项目文档
 ```
@@ -300,7 +300,7 @@ BaileysBot/
 node index.js
 
 # 在另一个终端测试客户端
-node example.js
+node login.js
 ```
 
 ### 调试模式

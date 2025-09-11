@@ -275,7 +275,7 @@ tail -f api.log
 
 ## 🔄 与 CLI 版本的区别
 
-| 功能 | CLI 版本 (example.js) | API 版本 (index.js) |
+| 功能 | CLI 版本 (login.js) | API 版本 (index.js) |
 |------|----------------------|-------------------|
 | 交互方式 | 终端交互 | HTTP API |
 | 连接类型 | 长连接 | 短连接（按需） |

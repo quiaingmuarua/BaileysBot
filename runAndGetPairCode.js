@@ -20,7 +20,7 @@ export function runAndGetPairCode({
   graceKillMs = 5000,
   cwd,
   env,
-  onPairCode,
+  onPairCode, onLoginStatus,
   onOutput,
 }) {
   return new Promise((resolve, reject) => {
@@ -46,7 +46,7 @@ export function runAndGetPairCode({
     const rlOut = readline.createInterface({ input: child.stdout, crlfDelay: Infinity });
     const rlErr = readline.createInterface({ input: child.stderr, crlfDelay: Infinity });
 
-    const tryMatch = (text) => {
+    const tryMatchPairCode = (text) => {
       const m = text.match(/pairCode:(\S+)/);
       if (m && !pairCode) {
         pairCode = m[1];
@@ -54,11 +54,22 @@ export function runAndGetPairCode({
       }
     };
 
+
+    const tryMatchLoginStatus = (text) => {
+      const m = text.match(/loginStatus:(\S+)/);
+      if (m && !pairCode) {
+        pairCode = m[1];
+        onLoginStatus?.(pairCode);
+
+      }
+    };
+
     const onLine = (line, stream) => {
       const chunk = line + '\n';
       output += chunk;
       onOutput?.(chunk, stream);
-      tryMatch(line);
+      tryMatchPairCode(line);
+      tryMatchLoginStatus(line);
     };
 
     rlOut.on('line', (l) => onLine(l, 'stdout'));

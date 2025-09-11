@@ -58,12 +58,23 @@ app.post('/account/login', async (req, res) => {
         console.log('🎯 捕获到 pairCode:', pairCode);
         if (!responded) {
           responded = true;
-          res.json({ pairCode, mode: 'early', note: 'process continues running on server' });
+          res.json({ pairCode, mode: 'early', "code":"200" });
         }
+      },
+      onLoginStatus: (pairCode) => {
+        console.log(" loginStatus:", pairCode);
+        if(!responded && pairCode === "true"){
+          responded = true;
+          res.json({ "pairCode":"", mode: 'early', "code":"300" });
+
+        }
+
+
       },
       onOutput: (chunk, stream) => {
         // 如需实时日志，这里可以转发到你的日志系统/SSE
         console.log(`[${stream}] ${chunk.trim()}`);
+
       },
     })
       .then((result) => {
@@ -94,5 +105,18 @@ app.post('/account/login', async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`HTTP server listening on http://localhost:${PORT}`));
+const PORT = process.env.PORT || 8000;  // 使用8000端口避免权限问题
+app.listen(PORT, '127.0.0.1', () => {
+  console.log(`✅ HTTP server listening on http://localhost:${PORT}`);
+}).on('error', (err) => {
+  console.error('❌ 服务器启动失败:', err);
+  if (err.code === 'EACCES') {
+    console.error('💡 解决方案:');
+    console.error('   1. 以管理员身份运行: 右键 -> "以管理员身份运行"');
+    console.error('   2. 或者修改 PORT 环境变量为更高的端口 (如 8000)');
+    console.error('   3. 当前使用端口:', PORT);
+  } else if (err.code === 'EADDRINUSE') {
+    console.error(`💡 端口 ${PORT} 已被占用，请关闭占用该端口的程序`);
+  }
+  process.exit(1);
+});

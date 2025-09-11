@@ -41,6 +41,7 @@ async function start() {
 		let { version, isLatest } = await fetchLatestBaileysVersion();
 
 		console.log("📋 已注册状态:", !!state?.creds?.registered);
+		console.log(`loginStatus:${ !!state?.creds?.registered} `)
 		console.log("正在使用 WhatsApp v" + version.join(".") + ", 是最新版本: " + isLatest);
 
 		console.log("🔌 创建 WhatsApp socket...");

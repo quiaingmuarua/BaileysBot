@@ -13,11 +13,18 @@ def login_demo():
 def timeout_demo():
     r = requests.post(
         'http://localhost:3000/account/login',
-        json={'script': 'timeout','number': '66961687880'},
+        json={'script': 'timeout','number': '66961687880',"timeout":10},
         timeout=10
-
     )
     print(r.json())
 
+def sync_contact_demo():
+    r = requests.get(
+        'http://localhost:3001/user/contacts',
+
+        timeout=60
+    )
+    print(r.text)
+
 if __name__ == '__main__':
-    login_demo()
+    sync_contact_demo()

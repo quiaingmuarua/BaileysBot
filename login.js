@@ -8,6 +8,7 @@ import makeWASocket, {
 import pino from "pino";
 import NodeCache from "node-cache";
 import readline from "readline";
+import fs from "fs";
 // Removed maxRetries - using simple reconnection like mini_example
 
 const logger = pino({
@@ -27,23 +28,29 @@ const question = text => new Promise(resolve => rl.question(text, resolve));
 const P = pino({
 	level: "silent",
 });
+let PROCESSSTATUS="init"
 
 async function start() {
+	console.log("🚀 开始启动 WhatsApp 连接...");
+	let phoneNumber =  process.argv[2];
+	if (!phoneNumber) {
+		console.log("phoneNumber is null or empty, please input it again")
+		return
+	}
+
+	phoneNumber=phoneNumber.replace(/[^0-9]/g, '');
+	const authPath = `AUTH/${phoneNumber}`;
+	PROCESSSTATUS="getNumber"
 	try {
-		console.log("🚀 开始启动 WhatsApp 连接...");
-		let phoneNumber =  process.argv[2];
-		if (!phoneNumber) {
-			console.log("phoneNumber is null or empty, please input it again")
-			return
-		}
-		phoneNumber=phoneNumber.replace(/[^0-9]/g, '');
-		let { state, saveCreds } = await useMultiFileAuthState(`AUTH/${phoneNumber}`);
+		let { state, saveCreds } = await useMultiFileAuthState(authPath);
 		let { version, isLatest } = await fetchLatestBaileysVersion();
 
 		console.log("📋 已注册状态:", !!state?.creds?.registered);
 		console.log(`loginStatus:${ !!state?.creds?.registered} `)
 		console.log("正在使用 WhatsApp v" + version.join(".") + ", 是最新版本: " + isLatest);
-
+		if(state?.creds?.registered){
+			PROCESSSTATUS="connected"
+		}
 		console.log("🔌 创建 WhatsApp socket...");
 		const sock = makeWASocket({
 			version,
@@ -59,6 +66,7 @@ async function start() {
 
 		console.log("💾 设置凭据自动保存...");
 		sock.ev.on("creds.update", saveCreds);
+		PROCESSSTATUS="login"
 
 	if (!sock.authState.creds.registered) {
 		console.log("🔍 账号未注册，开始配对流程...");
@@ -68,11 +76,13 @@ async function start() {
 		console.log("🔗 当前连接状态:", sock.ws?.readyState === 1 ? "OPEN" : "NOT_OPEN");
 
 		console.log("📝 正在请求配对码...");
+		PROCESSSTATUS="requestPairCode"
 		const code = await sock.requestPairingCode(phoneNumber);
 		console.log(`🔑 配对码生成成功: ${code}`);
 		console.log(`pairCode:${code} `)
 		console.log("🔗 配对码生成后连接状态:", sock.ws?.readyState === 1 ? "OPEN" : "NOT_OPEN");
 		console.log("⏳ 等待用户在 WhatsApp 中输入配对码...");
+		PROCESSSTATUS="successGetPairCode"
 	}
 
 	// 处理连接状态更新
@@ -136,6 +146,9 @@ async function start() {
 	return sock;
 	} catch (error) {
 		console.error("启动过程中发生错误:", error);
+		if(PROCESSSTATUS==="requestPairCode"){
+			fs.rmSync(authPath, { recursive: true, force: true });
+		}
 		process.exit(1);
 	}
 }

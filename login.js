@@ -50,6 +50,7 @@ async function start() {
 		console.log("正在使用 WhatsApp v" + version.join(".") + ", 是最新版本: " + isLatest);
 		if(state?.creds?.registered){
 			PROCESSSTATUS="connected"
+			// process.exit(0);
 		}
 		console.log("🔌 创建 WhatsApp socket...");
 		const sock = makeWASocket({
@@ -118,6 +119,7 @@ async function start() {
 			} else if (connection === "open") {
 				console.log("✅ WhatsApp 连接已建立！");
 				console.log("📱 已注册:", !!sock.authState?.creds?.registered);
+				process.exit(0);
 			}
 		}
 

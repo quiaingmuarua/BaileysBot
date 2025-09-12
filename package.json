@@ -6,8 +6,13 @@
      "type": "module",
      "scripts": {
           "start": "node example.js",
-          "server": "node index.js",
-          "dev": "node --watch index.js"
+          "http-server": "node webserverCli.js",
+          "ws-server": "node index.js",
+          "dev-http": "node --watch webserverCli.js",
+          "dev-ws": "node --watch index.js",
+          "test-ws": "python quick-test.py",
+          "demo-http": "python tests/http_demo.py",
+          "demo-ws": "python tests/websocket_demo.py"
      },
      "dependencies": {
           "@adiwajshing/keyed-db": "latest",

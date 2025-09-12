@@ -29,7 +29,7 @@ const P = pino({
 	level: "silent",
 });
 let PROCESSSTATUS="init"
-
+let max_retry_cnt=5
 async function start() {
 	console.log("🚀 开始启动 WhatsApp 连接...");
 	let phoneNumber =  process.argv[2];
@@ -46,12 +46,7 @@ async function start() {
 		let { version, isLatest } = await fetchLatestBaileysVersion();
 
 		console.log("📋 已注册状态:", !!state?.creds?.registered);
-		console.log(`loginStatus:${ !!state?.creds?.registered} `)
 		console.log("正在使用 WhatsApp v" + version.join(".") + ", 是最新版本: " + isLatest);
-		if(state?.creds?.registered){
-			PROCESSSTATUS="connected"
-			// process.exit(0);
-		}
 		console.log("🔌 创建 WhatsApp socket...");
 		const sock = makeWASocket({
 			version,
@@ -111,7 +106,15 @@ async function start() {
 					// lastDisconnect.error.output &&
 					// lastDisconnect.error.output.statusCode !== DisconnectReason.loggedOut
 				) {
-					console.log("🔄 连接已断开，正在重新连接...");
+					console.log("🔄 连接已断开，正在重新连接... " ,lastDisconnect?.error?.output?.statusCode);
+					max_retry_cnt-=1
+					if(max_retry_cnt<0){
+
+						throw new Error("max_retry_cnt is 0, please check your network")
+					}
+					if(lastDisconnect?.error?.output?.statusCode===401){
+							fs.rmSync(authPath, { recursive: true, force: true });
+					}
 					start();
 				} else {
 					console.log("🛑 连接已关闭，您已登出。");
@@ -119,7 +122,8 @@ async function start() {
 			} else if (connection === "open") {
 				console.log("✅ WhatsApp 连接已建立！");
 				console.log("📱 已注册:", !!sock.authState?.creds?.registered);
-				process.exit(0);
+				// console.log(`loginStatus:${ !!state?.creds?.registered} `)
+				process.exit(200);
 			}
 		}
 

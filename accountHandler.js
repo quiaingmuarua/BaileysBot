@@ -1,0 +1,138 @@
+// accountHandler.js - 共用的账户处理逻辑
+import { runAndGetPairCode } from './runAndGetPairCode.js';
+
+// 全局缓存，防止同一号码重复处理
+let numberCachedDict = {};
+
+/**
+ * 账户登录处理器 - 支持 HTTP 和 WebSocket
+ * @param {Object} params - 请求参数
+ * @param {string} params.number - 手机号码
+ * @param {number} [params.timeout=60] - 超时时间（秒）
+ * @param {string} [params.script="example"] - 执行脚本名称
+ * @param {Object} callbacks - 回调函数
+ * @param {Function} callbacks.onResponse - 响应回调
+ * @param {Function} callbacks.onError - 错误回调
+ * @param {Function} [callbacks.onOutput] - 输出日志回调
+ * @returns {Promise}
+ */
+export async function handleAccountLogin(params, callbacks) {
+  const { onResponse, onError, onOutput } = callbacks;
+  
+  try {
+    const body = params ?? {};
+    const script = body.script ?? "login";
+    const number = (body.number ?? '').toString().trim();
+    const timeout = Number.isFinite(Number(body.timeout)) ? Number(body.timeout) : 60;
+
+    if (!number) {
+      console.log('❌ 缺少 number 字段');
+      return onError({ code: 400, error: 'number 必填' });
+    }
+
+    // 检查号码是否正在处理中
+    if (numberCachedDict.number === number) {
+      console.log('number is in cached');
+      return onResponse({ 
+        type: 'e',
+        pairCode: "", 
+        code: "500", 
+        note: "number is in working" 
+      });
+    }
+    
+    // 标记号码为处理中
+    numberCachedDict.number = number;
+
+    // 构建命令参数
+    const cmdParams = { action: 'login', number, timeout, ...body };
+    const cmdString = `node ${script}.js ${number}`;
+    const timeoutMs = timeout * 1000 + 10_000;
+
+    console.log('➡️ 执行命令:', cmdString, '  (timeoutMs=', timeoutMs, ')');
+
+    let responded = false;
+    let  getPairCode= false
+
+    // 启动账户登录任务
+    const taskPromise = runAndGetPairCode({
+      cmdString,
+      timeoutMs,
+      onPairCode: (pairCode) => {
+        console.log('🎯 捕获到 pairCode:', pairCode);
+        if (!responded) {
+          responded = true;
+          getPairCode=true
+          onResponse({ pairCode, mode: 'early', code: "200" });
+        }
+      },
+      onLoginStatus: (loginStatus) => {
+        console.log("loginStatus:", loginStatus);
+        if (!responded && loginStatus === "true") {
+          responded = true;
+          onResponse({ 
+            pairCode: "", 
+            mode: 'early', 
+            code: "300", 
+            note: "loginStatus is true" 
+          });
+        }
+      },
+      onOutput: (chunk, stream) => {
+        // 转发实时日志
+        console.log(`[${stream}] ${chunk.trim()}`);
+        onOutput?.(chunk, stream);
+      },
+    });
+
+    // 处理任务完成
+    taskPromise
+      .then((result) => {
+        // 清除缓存
+        numberCachedDict.number = "";
+        console.log('✅ 子进程结束:', {
+          exitCode: result.exitCode,
+          timedOut: result.timedOut,
+          pairCode: result.pairCode,
+        });
+        if(result.exitCode ===200 &&getPairCode === true) {
+           onResponse({code: result.exitCode, note : "login success" });
+
+        }else {
+            onResponse({ code: result.exitCode, note: "process exit" });
+        }
+
+      })
+      .catch((err) => {
+        console.error('🔥 子进程异常:', err);
+        numberCachedDict.number = "";
+        if (!responded) {
+          responded = true;
+          onError({ code: 500, error: err?.message || 'Internal Server Error' });
+        }
+      });
+
+    return taskPromise;
+
+  } catch (e) {
+    console.error('🔥 账户处理异常:', e);
+    numberCachedDict.number = "";
+    onError({ code: 500, error: e?.message || 'Internal Server Error' });
+  }
+}
+
+/**
+ * 获取缓存状态
+ */
+export function getCacheStatus() {
+  return { ...numberCachedDict };
+}
+
+/**
+ * 清除特定号码的缓存
+ */
+export function clearNumberCache(number) {
+  if (numberCachedDict.number === number) {
+    numberCachedDict.number = "";
+  }
+}

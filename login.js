@@ -122,7 +122,7 @@ async function start() {
 			} else if (connection === "open") {
 				console.log("✅ WhatsApp 连接已建立！");
 				console.log("📱 已注册:", !!sock.authState?.creds?.registered);
-				// console.log(`loginStatus:${ !!state?.creds?.registered} `)
+				console.log(`loginStatus:${ !!state?.creds?.registered} `)
 				process.exit(200);
 			}
 		}

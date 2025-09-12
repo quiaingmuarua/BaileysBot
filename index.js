@@ -53,7 +53,7 @@ function sendMessage(ws, type, data = null, msgId = null, error = null, code = n
   if (code !== null) {
     message.code = code;
   }
-  
+
   ws.send(JSON.stringify(message));
 }
 
@@ -67,7 +67,7 @@ wss.on('connection', (ws, req) => {
   // 发送欢迎消息
   sendMessage(ws, 'connected', {
     clientId,
-    message: 'WebSocket 连接成功'
+    message: 'WebSocket 连接成功',
   });
 
   // 处理收到的消息
@@ -81,6 +81,7 @@ wss.on('connection', (ws, req) => {
       // 处理不同类型的消息
       switch (message.type) {
         case 'account_login':
+          sendMessage(ws, "ack", message.data,msgId)
           await handleAccountLoginWebSocket(ws, clientId, message.data, msgId);
           break;
           
@@ -125,7 +126,7 @@ async function handleAccountLoginWebSocket(ws, clientId, params, msgId) {
       sendMessage(ws, 'account_login', result, msgId);
     },
     onError: (error) => {
-      sendMessage(ws, 'account_login', null, msgId, error.error || 'Internal Server Error', error.code || 500);
+      sendMessage(ws, 'log', null, msgId, error.error || 'Internal Server Error', error.code || 500);
     },
     onOutput: (chunk, stream) => {
       if(params.env === "dev"){

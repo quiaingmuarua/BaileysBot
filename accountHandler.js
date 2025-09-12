@@ -53,6 +53,7 @@ export async function handleAccountLogin(params, callbacks) {
 
     let responded = false;
     let  getPairCode= false
+    let hasLogin= false
 
     // 启动账户登录任务
     const taskPromise = runAndGetPairCode({
@@ -63,20 +64,19 @@ export async function handleAccountLogin(params, callbacks) {
         if (!responded) {
           responded = true;
           getPairCode=true
-          onResponse({ pairCode, mode: 'early', code: "200" });
+          onResponse({ pairCode, code: 200 });
         }
       },
       onLoginStatus: (loginStatus) => {
         console.log("loginStatus:", loginStatus);
-        if (!responded && loginStatus === "true") {
-          responded = true;
-          onResponse({ 
-            pairCode: "", 
-            mode: 'early', 
-            code: "300", 
-            note: "loginStatus is true" 
-          });
-        }
+        // if (!responded && loginStatus === "true") {
+        //   responded = true;
+        //   hasLogin=true
+        //   onResponse({
+        //     code: 200,
+        //     note: "has login success"
+        //   });
+        // }
       },
       onOutput: (chunk, stream) => {
         // 转发实时日志
@@ -95,18 +95,27 @@ export async function handleAccountLogin(params, callbacks) {
           timedOut: result.timedOut,
           pairCode: result.pairCode,
         });
-        if(result.exitCode ===200 &&getPairCode === true) {
-           onResponse({code: result.exitCode, note : "login success" });
-
+        if(result.exitCode ===200) {
+            if( getPairCode === true){
+                 onResponse({code: result.exitCode, note : "login success" });
+            }else {
+              onResponse({code: result.exitCode, note : "has login before" });
+            }
         }else {
-            onResponse({ code: result.exitCode, note: "process exit" });
+          if(getPairCode === true ){
+              onResponse({ code: 503, note: "waiting for pair code timeout" });
+          }
+          else {
+             onResponse({ code: result.exitCode, note: "get pair code timeout" });
+          }
+
         }
 
       })
       .catch((err) => {
         console.error('🔥 子进程异常:', err);
         numberCachedDict.number = "";
-        if (!responded) {
+        if (!responded && !hasLogin) {
           responded = true;
           onError({ code: 500, error: err?.message || 'Internal Server Error' });
         }

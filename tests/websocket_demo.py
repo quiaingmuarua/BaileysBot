@@ -34,7 +34,7 @@ async def login_demo():
         login_request = {
             "type": "account_login",
             "msgId": uuid.uuid4().hex,
-           
+            "tag": "ack", #log
             "data": {
                 "number": "66952407035",
                 "timeout": 60,

@@ -42,6 +42,7 @@ export function runAndGetPairCode({
     let exitSignal = null;
     let killerTimer = null;
     let hardKillerTimer = null;
+    let loginStatus = null;
 
     const rlOut = readline.createInterface({ input: child.stdout, crlfDelay: Infinity });
     const rlErr = readline.createInterface({ input: child.stderr, crlfDelay: Infinity });
@@ -57,9 +58,9 @@ export function runAndGetPairCode({
 
     const tryMatchLoginStatus = (text) => {
       const m = text.match(/loginStatus:(\S+)/);
-      if (m && !pairCode) {
-        pairCode = m[1];
-        onLoginStatus?.(pairCode);
+      if (m && !loginStatus) {
+        loginStatus = m[1];
+        onLoginStatus?.(loginStatus);
 
       }
     };

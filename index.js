@@ -9,6 +9,7 @@ app.use(cors());
 app.use(express.json({ limit: '1mb' }));
 
 app.get('/health', (_req, res) => res.json({ ok: true }));
+let number_cached_dict={}
 
 /**
  * POST /account/login
@@ -49,6 +50,12 @@ app.post('/account/login', async (req, res) => {
     console.log('➡️ 执行命令:', cmdString, '  (timeoutMs=', timeoutMs, ')');
 
     let responded = false;
+    //check the number is in cached
+    if(number_cached_dict.number===number){
+      console.log('number is in cached');
+      return res.json({ mode: 'final', pairCode: "", "code":"500","note":"number is in woking" });
+    }
+    number_cached_dict.number=number;
 
     // 启动任务：不要 await！
     runAndGetPairCode({
@@ -65,7 +72,7 @@ app.post('/account/login', async (req, res) => {
         console.log(" loginStatus:", pairCode);
         if(!responded && pairCode === "true"){
           responded = true;
-          res.json({ "pairCode":"", mode: 'early', "code":"300" });
+          res.json({ "pairCode":"", mode: 'early', "code":"300","note":"loginStatus is true" });
 
         }
 
@@ -79,6 +86,7 @@ app.post('/account/login', async (req, res) => {
     })
       .then((result) => {
         // 任务结束后的收尾日志；不要再写 res（可能已返回）
+        number_cached_dict.number="";
         console.log('✅ 子进程结束:', {
           exitCode: result.exitCode,
           timedOut: result.timedOut,
@@ -105,9 +113,12 @@ app.post('/account/login', async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 8000;  // 使用8000端口避免权限问题
-app.listen(PORT, '127.0.0.1', () => {
-  console.log(`✅ HTTP server listening on http://localhost:${PORT}`);
+const PORT = process.env.PORT || 8000;
+const HOST = process.env.HOST || '127.0.0.1';  // Docker 中使用 0.0.0.0，本地开发可用 127.0.0.1
+
+app.listen(PORT, HOST, () => {
+  console.log(`✅ HTTP server listening on http://${HOST}:${PORT}`);
+  console.log(`🌐 访问地址: http://localhost:${PORT}`);
 }).on('error', (err) => {
   console.error('❌ 服务器启动失败:', err);
   if (err.code === 'EACCES') {

@@ -1,0 +1,43 @@
+services:
+  wabot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: wabot-server
+    ports:
+      - "8000:8000"
+    volumes:
+      # 重要：映射 AUTH 目录到宿主机，保持 WhatsApp token 数据持久化
+      - ./AUTH:/app/AUTH:rw
+      # 可选：映射日志目录
+      - ./logs:/app/logs:rw
+    environment:
+      - NODE_ENV=production
+      - PORT=8000
+    restart: unless-stopped
+    networks:
+      - wabot-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    # 资源限制
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+networks:
+  wabot-network:
+    driver: bridge
+
+# 可选：如果需要数据库，可以添加
+# volumes:
+#   wabot-data:
+#     driver: local

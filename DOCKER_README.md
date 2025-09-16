@@ -1,8 +1,44 @@
 # WhatsApp Bot Docker 部署指南
 
+本指南涵盖了单客户端和多客户端的 Docker 部署方案。
+
+## 🌟 部署模式
+
+### 🔄 单客户端模式
+传统的单一 WebSocket 客户端连接模式。
+
+### 🌐 多客户端模式 (推荐)
+支持同时运行多个 WebSocket 客户端，实现多账号管理和负载分担。
+
 ## 🚀 快速启动
 
-### 方式一：使用启动脚本 (推荐)
+### 🌐 多客户端部署 (推荐)
+
+#### 步骤 1: 启动 WebSocket 服务器
+```bash
+# 安装 Python 依赖
+cd tests
+pip3 install -r requirements.txt
+
+# 启动服务器
+python3 websocket_server_demo.py
+```
+
+#### 步骤 2: 启动多个客户端
+```bash
+# 启动 3 个客户端实例
+docker compose up --build --scale wabot=3
+
+# 后台运行 5 个实例
+docker compose up --build --scale wabot=5 -d
+```
+
+#### 步骤 3: 管理客户端
+在服务器控制台使用交互式命令管理客户端。详见 [多客户端使用指南](MULTI_CLIENT_USAGE.md)。
+
+### 🔄 单客户端部署 (传统模式)
+
+#### 方式一：使用启动脚本
 
 **Windows:**
 ```bash
@@ -179,6 +215,38 @@ docker-compose up --build -d
 - **重启策略**: unless-stopped
 - **健康检查**: 30s 间隔
 
+## 🌐 多客户端高级配置
+
+### 资源管理
+```yaml
+# 自定义资源限制
+deploy:
+  resources:
+    limits: { cpus: '0.5', memory: '512M' }
+    reservations: { cpus: '0.1', memory: '128M' }
+```
+
+### 扩展配置
+```bash
+# 动态调整实例数量
+docker compose up --scale wabot=3     # 3个实例
+docker compose up --scale wabot=5     # 扩展到5个实例
+```
+
+### 网络配置 (Bridge模式)
+```yaml
+# 如果host模式不可用
+environment:
+  - WS_URL=ws://192.168.1.100:8001/ws  # 使用主机IP
+networks:
+  - wabot-network
+```
+
+## 🔧 相关文档
+
+- [多客户端使用指南](MULTI_CLIENT_USAGE.md) - 详细配置和管理
+- [故障排除指南](TROUBLESHOOTING.md) - 常见问题解决
+
 ---
 
-🎉 **部署完成！** 你的 WhatsApp Bot 现在运行在 Docker 容器中，AUTH 数据安全保存在宿主机。
+🎉 **部署完成！** 你的 WhatsApp Bot 现在运行在 Docker 容器中，支持多客户端架构和高可用部署。

@@ -3,7 +3,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: wabot-client
+    # 移除固定container_name以支持多实例
+    # container_name: wabot-client
     # 使用主机网络模式，直接访问主机上的服务
     network_mode: host
     volumes:

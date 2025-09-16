@@ -4,12 +4,21 @@
 
 ## ✨ 功能特性
 
+### 🔄 WebSocket 客户端功能
 - 🔐 **配对码登录**: 无需扫描二维码，使用配对码登录 WhatsApp
 - 📱 **多账号支持**: 支持多个手机号并发操作，内置互斥锁机制
 - 🔄 **实时状态**: WebSocket 实时推送登录状态和配对码
 - 💾 **状态持久化**: 认证信息自动保存到 AUTH 目录
 - ⚡ **临时连接**: 每次操作创建临时 socket，操作完成后自动清理
 - 🛡️ **错误处理**: 完善的超时机制和错误处理
+
+### 🌐 多客户端架构 (NEW!)
+- 🚀 **多实例支持**: 同时运行多个 WebSocket 客户端
+- 🎯 **选择性登录**: 精确控制向哪个客户端发送登录请求
+- 📊 **实时管理**: 通过交互式命令管理所有连接
+- 🔗 **状态隔离**: 每个客户端独立管理认证状态
+- 📈 **扩展性强**: 支持任意数量的客户端连接
+- 🐳 **Docker 优化**: 优化的容器构建和部署
 
 ## 📋 环境要求
 
@@ -45,6 +54,41 @@ node index.js
 ```
 
 服务器将在 `ws://localhost:3001` 启动。
+
+## 🌐 多客户端部署 (推荐)
+
+### 使用 Docker Compose 快速部署
+
+#### 1. 启动服务器
+```bash
+# 启动 Python WebSocket 服务器
+cd tests
+python3 websocket_server_demo.py
+```
+
+#### 2. 启动多个客户端
+```bash
+# 启动 3 个 WebSocket 客户端实例
+docker compose up --build --scale wabot=3
+
+# 后台运行 5 个实例
+docker compose up --build --scale wabot=5 -d
+```
+
+#### 3. 管理客户端
+在服务器控制台使用交互式命令：
+```bash
+# 查看连接的客户端
+> list
+
+# 向指定客户端发送登录请求
+> login client-1 919079478346
+
+# 退出服务器
+> quit
+```
+
+**详细配置和故障排除请参考**: [多客户端使用指南](MULTI_CLIENT_USAGE.md)
 
 ## 📡 WebSocket API
 
@@ -345,6 +389,23 @@ const logger = pino({ level: "debug" });  // 改为 debug 查看详细日志
 # 设置环境变量启用详细日志
 NODE_ENV=development node index.js
 ```
+
+## 📚 文档索引
+
+### 🔧 部署和配置
+- [多客户端使用指南](MULTI_CLIENT_USAGE.md) - 详细的多客户端部署和管理指南
+- [Docker 部署指南](DOCKER_README.md) - Docker 容器化部署说明
+- [WebSocket API 文档](WEBSOCKET_API_DOC.md) - WebSocket 接口详细说明
+
+### 📋 API 参考
+- [HTTP/WS 使用指南](HTTP_WS_USAGE.md) - HTTP 和 WebSocket 使用方法
+- [API 使用说明](API_USAGE.md) - API 接口使用示例
+- [WebSocket 消息示例](websocket-message-examples.md) - 消息格式参考
+
+### 🛠️ 开发者资源
+- [故障排除指南](TROUBLESHOOTING.md) - 常见问题快速解决方案
+- [改进建议](IMPROVEMENTS.md) - 项目改进和优化建议
+- [技术笔记](node.md) - Node.js 相关技术说明
 
 ## 📜 许可证
 

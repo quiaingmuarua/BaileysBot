@@ -6,7 +6,7 @@ WORKDIR /app
 
 # 设置环境变量
 ENV NODE_ENV=production
-ENV PORT=8000
+ENV WS_URL=ws://127.0.0.1:8001/ws
 
 # 创建非 root 用户
 RUN addgroup -g 1001 -S nodejs
@@ -31,19 +31,11 @@ RUN chmod 755 /app
 # 切换到非 root 用户
 USER nodeuser
 
-# 暴露端口
-EXPOSE 8000
+# WebSocket客户端不需要暴露端口
 
-# 健康检查
+# 健康检查 - 检查进程是否正在运行
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node -e "const http = require('http'); \
-    const options = { hostname: 'localhost', port: 8000, path: '/health', method: 'GET' }; \
-    const req = http.request(options, (res) => { \
-      if (res.statusCode === 200) process.exit(0); \
-      else process.exit(1); \
-    }); \
-    req.on('error', () => process.exit(1)); \
-    req.end();"
+  CMD pgrep -f "node index.js" > /dev/null || exit 1
 
 # 启动应用
-CMD ["npm", "run", "server"]
+CMD ["npm", "run", "ws-client"]

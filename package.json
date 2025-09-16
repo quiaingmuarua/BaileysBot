@@ -7,7 +7,7 @@
      "scripts": {
           "start": "node example.js",
           "http-server": "node webserverCli.js",
-          "ws-server": "node index.js",
+          "ws-client": "node index.js",
           "dev-http": "node --watch webserverCli.js",
           "dev-ws": "node --watch index.js",
           "test-ws": "python quick-test.py",

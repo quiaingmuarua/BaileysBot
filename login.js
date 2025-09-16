@@ -12,8 +12,18 @@ import fs from "fs";
 import { SocksProxyAgent } from 'socks-proxy-agent'
 // Removed maxRetries - using simple reconnection like mini_example
 
-// 你的 SOCKS5 代理地址（带用户名密码）
-const proxyUrl = 'socks5://B_38313_US___5_W9axsY1S:121323@gate1.ipweb.cc:7778'
+function randomString(length = 8) {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
+const sessionId = randomString(8);
+const proxyUrl = `socks5://B_38313_US___5_${sessionId}:121323@gate1.ipweb.cc:7778`;
+
 
 // 创建代理 agent
 const proxyAgent = new SocksProxyAgent(proxyUrl);

@@ -9,7 +9,14 @@ import pino from "pino";
 import NodeCache from "node-cache";
 import readline from "readline";
 import fs from "fs";
+import { SocksProxyAgent } from 'socks-proxy-agent'
 // Removed maxRetries - using simple reconnection like mini_example
+
+// 你的 SOCKS5 代理地址（带用户名密码）
+const proxyUrl = 'socks5://B_38313_US___5_W9axsY1S:121323@gate1.ipweb.cc:7778'
+
+// 创建代理 agent
+const proxyAgent = new SocksProxyAgent(proxyUrl);
 
 const logger = pino({
 	timestamp: () => `,"time":"${new Date().toJSON()}"`,
@@ -58,6 +65,7 @@ async function start() {
 				keys: makeCacheableSignalKeyStore(state.keys, P),
 			},
 			msgRetryCounterCache,
+			  agent: proxyAgent,
 		});
 
 		console.log("💾 设置凭据自动保存...");

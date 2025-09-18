@@ -97,16 +97,16 @@ export async function handleAccountLogin(params, callbacks) {
         });
         if(result.exitCode ===200) {
             if( getPairCode === true){
-                 onResponse({code: result.exitCode, note : "login success" });
+                 onResponse({code: 200, note : "login success",tag:"loginResult" });
             }else {
-              onResponse({code: result.exitCode, note : "has login before" });
+              onResponse({code: 201, note : "has login before",tag:"loginResult" });
             }
         }else {
           if(getPairCode === true ){
-              onResponse({ code: 503, note: "waiting for pair code timeout" });
+              onResponse({ code: 300, note: "waiting for pair code timeout" ,tag:"loginResult"});
           }
           else {
-             onResponse({ code: result.exitCode, note: "get pair code timeout" });
+             onResponse({ code: 301, note: "get pair code timeout" ,tag:"loginResult"});
           }
 
         }
@@ -117,7 +117,7 @@ export async function handleAccountLogin(params, callbacks) {
         numberCachedDict.number = "";
         if (!responded && !hasLogin) {
           responded = true;
-          onError({ code: 500, error: err?.message || 'Internal Server Error' });
+          onError({ code: 500, error: err?.message || 'Internal Server Error',tag:"loginResult" });
         }
       });
 

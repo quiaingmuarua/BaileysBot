@@ -17,6 +17,10 @@ new_message {'type': 'account_login', 'timestamp': '2025-09-12T08:48:43.241Z', '
 new_message {'type': 'account_login', 'timestamp': '2025-09-12T08:49:47.289Z', 'msgId': '04f01507d70d444aa61c859127241d59', 'data': {'code': 503, 'note': 'waiting for pair code timeout'}}
 
 
+
+
+
+
 外层code：
 100 开始处理
 101 请求配对码
@@ -29,7 +33,29 @@ new_message {'type': 'account_login', 'timestamp': '2025-09-12T08:49:47.289Z', '
 500 进程异常断开
 501 账号登录中，并发处理被拒绝
 502 获取配对码被拒绝
-503 进程超时退出
+
+
+tag：server、client、exit(号码退出)
+
+server msg code:
+200 业务成功   
+3xx  可重试错误
+4xx 不可重试
+
+
+client msg code：
+200 账号登录成功
+201 收到新消息
+。。。。
+
+
+exit msg code (目前设计)
+200 获取配对码后登录成功退出
+201 直接登录成功 退出
+
+300 已获取配对码，等待配对超时
+301 获取配对码时退出
+
 
 
 

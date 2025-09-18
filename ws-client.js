@@ -1,6 +1,6 @@
 // ws-client.js - WebSocket 客户端（ESM）
 import WebSocket from 'ws';
-import { handleAccountLogin, getCacheStatus } from './accountHandler.js';
+import {getCacheStatus, handleAccountLogin} from './accountHandler.js';
 
 const DEFAULTS = {
   RECONNECT: true,
@@ -64,7 +64,7 @@ export class WSAppClient {
    * @param {string|null} error
    * @param {number|null} code
    */
-  sendMessage(type, data = null, msgId = null, error = null, code = null) {
+  sendMessage(type, data = null, msgId = null, error = null, code = null, tag = null) {
     const payload = {
       type,
       timestamp: new Date().toISOString(),
@@ -73,6 +73,7 @@ export class WSAppClient {
     if (data !== null) payload.data = data;
     if (error !== null) payload.error = error;
     if (code !== null) payload.code = code;
+    if (tag != null) payload.tag = tag;
 
     this._sendRaw(payload);
   }

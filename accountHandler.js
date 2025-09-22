@@ -34,8 +34,8 @@ export async function handleAccountLogin(params, callbacks) {
     if (numberCachedDict.number === number) {
       console.log('number is in cached');
       return onResponse({ 
-        type: 'e',
-        pairCode: "", 
+        type: 'error',
+        number:number,
         code: "500", 
         note: "number is in working" 
       });
@@ -64,7 +64,7 @@ export async function handleAccountLogin(params, callbacks) {
         if (!responded) {
           responded = true;
           getPairCode=true
-          onResponse({ pairCode, code: 200 });
+          onResponse({ pairCode, code: 200,tag:"pairCode",  number:number,});
         }
       },
       onLoginStatus: (loginStatus) => {
@@ -97,16 +97,16 @@ export async function handleAccountLogin(params, callbacks) {
         });
         if(result.exitCode ===200) {
             if( getPairCode === true){
-                 onResponse({code: 200, note : "login success",tag:"loginResult" });
+                 onResponse({code: 200, note : "login success",tag:"loginResult",  number:number });
             }else {
-              onResponse({code: 201, note : "has login before",tag:"loginResult" });
+              onResponse({code: 201, note : "has login before",tag:"loginResult" ,  number:number});
             }
         }else {
           if(getPairCode === true ){
-              onResponse({ code: 300, note: "waiting for pair code timeout" ,tag:"loginResult"});
+              onResponse({ code: 300, note: "waiting for pair code timeout" ,tag:"loginResult",  number:number});
           }
           else {
-             onResponse({ code: 301, note: "get pair code timeout" ,tag:"loginResult"});
+             onResponse({ code: 301, note: "get pair code timeout" ,tag:"loginResult",  number:number});
           }
 
         }
@@ -117,7 +117,7 @@ export async function handleAccountLogin(params, callbacks) {
         numberCachedDict.number = "";
         if (!responded && !hasLogin) {
           responded = true;
-          onError({ code: 500, error: err?.message || 'Internal Server Error',tag:"loginResult" });
+          onError({ code: 500, error: err?.message || 'Internal Server Error',tag:"loginResult",  number:number });
         }
       });
 
@@ -126,7 +126,7 @@ export async function handleAccountLogin(params, callbacks) {
   } catch (e) {
     console.error('🔥 账户处理异常:', e);
     numberCachedDict.number = "";
-    onError({ code: 500, error: e?.message || 'Internal Server Error' });
+    onError({ code: 500, error: e?.message || 'Internal Server Error',  number:number, });
   }
 }
 

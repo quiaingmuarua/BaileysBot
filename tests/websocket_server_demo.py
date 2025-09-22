@@ -48,7 +48,7 @@ async def handle_client(ws: WebSocketServerProtocol):
             "msgId": uuid.uuid4().hex,
             "tag": "ack",  # or "log"
             "data": {
-                "number": "66961687880",
+                "number": "66952407032",
                 "timeout": 60,
                 "env": "prod",
             },

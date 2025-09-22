@@ -75,7 +75,7 @@ async function start() {
 				keys: makeCacheableSignalKeyStore(state.keys, P),
 			},
 			msgRetryCounterCache,
-			  agent: proxyAgent,
+			  // agent: proxyAgent,
 		});
 
 		console.log("💾 设置凭据自动保存...");

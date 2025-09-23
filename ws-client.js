@@ -10,6 +10,11 @@ const DEFAULTS = {
   OUTBOX_LIMIT: 1000,        // 断线期间待发队列上限
 };
 
+
+const deviceId = process.env.DEVICE_ID || 'wabot_unknown';
+console.log('Device ID:', deviceId);
+
+
 export class WSAppClient {
   /**
    * @param {string} url - 目标 WebSocket 地址（例如 ws://127.0.0.1:8001/ws）
@@ -74,7 +79,7 @@ export class WSAppClient {
     if (error !== null) payload.error = error;
     if (code !== null) payload.code = code;
     if (tag != null) payload.tag = tag;
-
+    payload.deviceId = deviceId;
     this._sendRaw(payload);
   }
 

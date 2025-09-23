@@ -55,7 +55,7 @@ async def handle_client(ws: WebSocketServerProtocol):
             "timestamp": __import__("datetime").datetime.utcnow().isoformat() + "Z",
         }
         print(f"📤 发送登录请求: {login_request}")
-        await ws.send(json.dumps(login_request))
+        # await ws.send(json.dumps(login_request))
 
         # 持续接收并打印
         async for message in ws:

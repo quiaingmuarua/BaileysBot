@@ -1,41 +1,47 @@
+x-wabot-base: &wabot-base
+  build:
+    context: .
+    dockerfile: Dockerfile
+  # 不要设置 container_name，支持多实例
+  network_mode: host
+  volumes:
+    - ./AUTH:/app/AUTH:rw
+    - ./baileys:/app/baileys:ro
+    - ./logs:/app/logs:rw
+  environment: &wabot-env
+    NODE_ENV: production
+    WS_URL: ws://127.0.0.1:8001/ws
+  healthcheck:
+    test: ["CMD", "pgrep", "-f", "node index.js"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 40s
+  deploy:
+    resources:
+      limits:
+        cpus: '1.0'
+        memory: 1G
+      reservations:
+        cpus: '0.25'
+        memory: 256M
+  restart: unless-stopped
+
 services:
-  wabot:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    # 移除固定container_name以支持多实例
-    # container_name: wabot-client
-    # 使用主机网络模式，直接访问主机上的服务
-    network_mode: host
-    volumes:
-      # 重要：映射 AUTH 目录到宿主机，保持 WhatsApp token 数据持久化
-      - ./AUTH:/app/AUTH:rw
-      # 共享 baileys 依赖目录
-      - ./baileys:/app/baileys:ro
-      # 可选：映射日志目录
-      - ./logs:/app/logs:rw
+  wabot1:
+    <<: *wabot-base
     environment:
-      - NODE_ENV=production
-      - WS_URL=ws://127.0.0.1:8001/ws
-    healthcheck:
-      test: ["CMD", "pgrep", "-f", "node index.js"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-    # 资源限制
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 1G
-        reservations:
-          cpus: '0.25'
-          memory: 256M
+      <<: *wabot-env
+      DEVICE_ID: 1
 
-# 使用host网络模式时不需要自定义网络
+  wabot2:
+    <<: *wabot-base
+    environment:
+      <<: *wabot-env
+      DEVICE_ID: 2
 
-# 可选：如果需要数据库，可以添加
-# volumes:
-#   wabot-data:
-#     driver: local
+  wabot3:
+    <<: *wabot-base
+    environment:
+      <<: *wabot-env
+      DEVICE_ID: 3

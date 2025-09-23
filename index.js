@@ -1,7 +1,8 @@
 // index.js - 启动 WebSocket 客户端
 import { WSAppClient } from './ws-client.js';
 
-const WS_URL = process.env.WS_URL || 'ws://192.168.3.65:8088/ws';
+// const WS_URL = process.env.WS_URL || 'ws://192.168.3.65:8088/ws';
+const WS_URL = process.env.WS_URL || 'ws://127.0.0.1:8001/ws';
 
 const client = new WSAppClient(WS_URL, {
   reconnect: true,

@@ -6,7 +6,7 @@ WORKDIR /app
 
 # 设置环境变量
 ENV NODE_ENV=production
-ENV WS_URL=ws://127.0.0.1:8001/ws
+ENV WS_URL=ws://10.148.0.3:8088/ws
 
 # 创建非 root 用户
 RUN addgroup -g 1001 -S nodejs

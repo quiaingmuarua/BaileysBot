@@ -10,7 +10,7 @@ x-wabot-base: &wabot-base
     - ./logs:/app/logs:rw
   environment: &wabot-env
     NODE_ENV: production
-    WS_URL: ws://10.148.0.3:8088/ws
+    WS_URL: 'ws://127.0.0.1:8001/ws'
   healthcheck:
     test: ["CMD", "pgrep", "-f", "node index.js"]
     interval: 30s
@@ -30,18 +30,21 @@ x-wabot-base: &wabot-base
 services:
   wabot1:
     <<: *wabot-base
+    user: root
     environment:
       <<: *wabot-env
       DEVICE_ID: 1
 
   wabot2:
     <<: *wabot-base
+    user: root
     environment:
       <<: *wabot-env
       DEVICE_ID: 2
 
   wabot3:
     <<: *wabot-base
+    user: root
     environment:
       <<: *wabot-env
       DEVICE_ID: 3

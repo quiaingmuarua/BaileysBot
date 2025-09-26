@@ -44,7 +44,7 @@ async def handle_client(ws: WebSocketServerProtocol):
 
         # 发送账户登录请求
         login_request = {
-            "type": "account_login",
+            "type": "account_verify",
             "msgId": uuid.uuid4().hex,
             "tag": "ack",  # or "log"
             "data": {

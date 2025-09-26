@@ -22,11 +22,11 @@ function randomString(length = 8) {
 }
 
 const sessionId = randomString(8);
-const proxyUrl = `socks5://B_38313_US___5_${sessionId}:121323@gate1.ipweb.cc:7778`;
+const proxyUrl = `socks5://B_38313_US___90_${sessionId}:121323@gate1.ipweb.cc:7778`;
 
 
 // 创建代理 agent
-const proxyAgent = new SocksProxyAgent(proxyUrl);
+let proxyAgent = new SocksProxyAgent(proxyUrl);
 
 const logger = pino({
 	timestamp: () => `,"time":"${new Date().toJSON()}"`,
@@ -47,18 +47,27 @@ const P = pino({
 });
 let PROCESSSTATUS="init"
 let max_retry_cnt=5
+
+const args = process.argv.slice(2).join("&").replace(/--/g, "");
+
+const params = new URLSearchParams(args);
+console.log("params:",params)
+
 async function start() {
 	console.log("🚀 开始启动 WhatsApp 连接...");
-	let phoneNumber =  process.argv[2];
+	let phoneNumber = params.get("phoneNumber");
 	if (!phoneNumber) {
 		console.log("phoneNumber is null or empty, please input it again")
 		return
 	}
-	let methodType =process.argv[3];
+	let methodType =params.get("methodType");
 
 	phoneNumber=phoneNumber.replace(/[^0-9]/g, '');
 	const authPath = `AUTH/${phoneNumber}`;
 	PROCESSSTATUS="getNumber"
+	if (params.get("proxy")==="direct"){
+		proxyAgent=null
+	}
 	try {
 		let { state, saveCreds } = await useMultiFileAuthState(authPath);
 		let { version, isLatest } = await fetchLatestBaileysVersion();
@@ -76,7 +85,7 @@ async function start() {
 				keys: makeCacheableSignalKeyStore(state.keys, P),
 			},
 			msgRetryCounterCache,
-			  // agent: proxyAgent,
+			  agent: proxyAgent,
 		});
 
 		console.log("💾 设置凭据自动保存...");

@@ -25,6 +25,7 @@ export async function handleAccountLogin(params, callbacks) {
     const script = body.script ?? "login";
     const number = (body.number ?? '').toString().trim();
     const type =body.type ?? "";
+    const proxy =body.proxy ?? "";
     const timeout = Number.isFinite(Number(body.timeout)) ? Number(body.timeout) : 60;
 
     if (!number) {
@@ -48,7 +49,7 @@ export async function handleAccountLogin(params, callbacks) {
 
     // 构建命令参数
     const cmdParams = { action: 'login', number, timeout, ...body };
-    const cmdString = `node ${script}.js ${number} ${type}`;
+    const cmdString = `node ${script}.js --phoneNumber=${number} --methodType=${type} --proxy=${proxy}`;
     const timeoutMs = timeout * 1000 + 10_000;
 
     console.log('➡️ 执行命令:', cmdString, '  (timeoutMs=', timeoutMs, ')');

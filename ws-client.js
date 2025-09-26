@@ -206,9 +206,10 @@ export class WSAppClient {
         break;
 
       case 'account_login':
+      case 'account_verify':
         // 与服务器版一致：先 ack，再处理
         this.sendMessage('ack', data, msgId);
-        await this._handleAccountLoginClient(data, msgId);
+        await this._handleAccountLoginClient(data, msgId,type);
         break;
 
       default:
@@ -218,15 +219,16 @@ export class WSAppClient {
     }
   }
 
-  async _handleAccountLoginClient(params, msgId) {
+  async _handleAccountLoginClient(params, msgId,type) {
     // 复用你现有的 handleAccountLogin，并保持回调协议一致
+    params['type']=type
     await handleAccountLogin(params, {
       onResponse: (result) => {
-        this.sendMessage('account_login', result, msgId);
+        this.sendMessage(type, result, msgId);
       },
       onError: (error) => {
         this.sendMessage(
-          'log',
+          type,
           null,
           msgId,
           error?.error || 'Internal Server Error',

@@ -8,6 +8,7 @@ let numberCachedDict = {};
  * 账户登录处理器 - 支持 HTTP 和 WebSocket
  * @param {Object} params - 请求参数
  * @param {string} params.number - 手机号码
+ * @param {string} params.type - 消息类型
  * @param {number} [params.timeout=60] - 超时时间（秒）
  * @param {string} [params.script="example"] - 执行脚本名称
  * @param {Object} callbacks - 回调函数
@@ -23,6 +24,7 @@ export async function handleAccountLogin(params, callbacks) {
     const body = params ?? {};
     const script = body.script ?? "login";
     const number = (body.number ?? '').toString().trim();
+    const type =body.type ?? "";
     const timeout = Number.isFinite(Number(body.timeout)) ? Number(body.timeout) : 60;
 
     if (!number) {
@@ -46,7 +48,7 @@ export async function handleAccountLogin(params, callbacks) {
 
     // 构建命令参数
     const cmdParams = { action: 'login', number, timeout, ...body };
-    const cmdString = `node ${script}.js ${number}`;
+    const cmdString = `node ${script}.js ${number} ${type}`;
     const timeoutMs = timeout * 1000 + 10_000;
 
     console.log('➡️ 执行命令:', cmdString, '  (timeoutMs=', timeoutMs, ')');
@@ -69,14 +71,6 @@ export async function handleAccountLogin(params, callbacks) {
       },
       onLoginStatus: (loginStatus) => {
         console.log("loginStatus:", loginStatus);
-        // if (!responded && loginStatus === "true") {
-        //   responded = true;
-        //   hasLogin=true
-        //   onResponse({
-        //     code: 200,
-        //     note: "has login success"
-        //   });
-        // }
       },
       onOutput: (chunk, stream) => {
         // 转发实时日志
@@ -96,12 +90,24 @@ export async function handleAccountLogin(params, callbacks) {
           pairCode: result.pairCode,
         });
         if(result.exitCode ===200) {
-            if( getPairCode === true){
+            if(type==="account_login"){
+                        if( getPairCode === true){
                  onResponse({code: 200, note : "login success",tag:"loginResult",  number:number });
             }else {
+
               onResponse({code: 201, note : "has login before",tag:"loginResult" ,  number:number});
             }
-        }else {
+
+            }else{
+              onResponse({code: 200, note : "login success",tag:"loginResult",  number:number ,isActive:"active"});
+            }
+
+
+        }else if (result.exitCode===100) {
+          onResponse({code: 200, note : "login success",tag:"loginResult",  number:number ,isActive:"unavailable"});
+
+        }
+          else{
           if(getPairCode === true ){
               onResponse({ code: 300, note: "waiting for pair code timeout" ,tag:"loginResult",  number:number});
           }

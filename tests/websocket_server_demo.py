@@ -44,18 +44,18 @@ async def handle_client(ws: WebSocketServerProtocol):
 
         # 发送账户登录请求
         login_request = {
-            "type": "account_login",
+            "type": "account_verify",
             "msgId": uuid.uuid4().hex,
             "tag": "ack",  # or "log"
             "data": {
-                "number": "66952407032",
+                "number": "66952407035",
                 "timeout": 60,
                 "env": "prod",
             },
             "timestamp": __import__("datetime").datetime.utcnow().isoformat() + "Z",
         }
         print(f"📤 发送登录请求: {login_request}")
-        # await ws.send(json.dumps(login_request))
+        await ws.send(json.dumps(login_request))
 
         # 持续接收并打印
         async for message in ws:

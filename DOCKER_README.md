@@ -31,6 +31,10 @@ docker compose up --build --scale wabot=3
 
 # 后台运行 5 个实例
 docker compose up --build --scale wabot=5 -d
+
+podman compose up -d
+podman compose build
+
 ```
 
 #### 步骤 3: 管理客户端

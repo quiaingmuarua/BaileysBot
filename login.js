@@ -54,6 +54,7 @@ async function start() {
 		console.log("phoneNumber is null or empty, please input it again")
 		return
 	}
+	let methodType =process.argv[3];
 
 	phoneNumber=phoneNumber.replace(/[^0-9]/g, '');
 	const authPath = `AUTH/${phoneNumber}`;
@@ -81,6 +82,13 @@ async function start() {
 		console.log("💾 设置凭据自动保存...");
 		sock.ev.on("creds.update", saveCreds);
 		PROCESSSTATUS="login"
+		if(methodType!=="account_login"){
+			console.log("sock.authState.creds.registered "+sock.authState.creds.registered)
+			if(!sock.authState.creds.registered){
+				process.exit(100);
+			}
+
+		}
 
 	if (!sock.authState.creds.registered) {
 		console.log("🔍 账号未注册，开始配对流程...");

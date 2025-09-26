@@ -5,9 +5,9 @@ x-wabot-base: &wabot-base
   # 不要设置 container_name，支持多实例
   network_mode: host
   volumes:
-    - ./AUTH:/app/AUTH:rw
-    - ./baileys:/app/baileys:ro
-    - ./logs:/app/logs:rw
+    - ./AUTH:/app/AUTH:rw,Z
+    - ./baileys:/app/baileys:ro,Z
+    - ./logs:/app/logs:rw,Z
   environment: &wabot-env
     NODE_ENV: production
     WS_URL: 'ws://127.0.0.1:8001/ws'

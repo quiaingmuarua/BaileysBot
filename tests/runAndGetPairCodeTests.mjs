@@ -1,9 +1,12 @@
-import { runAndGetPairCode } from '../extra/runAndGetPairCode.js';
+import { runAndGetPairCode } from '../runAndGetPairCode.js';
+import * as timers from "node:timers";
 
 (async () => {
+  let s_time = new Date().getTime();
+  console.log("now time ",new Date().getTime());
   const result = await runAndGetPairCode({
-    cmdString: 'node ../timeout.js',   // 或任何 shell 命令
-    timeoutMs: 10000,                     // 10s 超时
+    cmdString: 'node timeout.js',   // 或任何 shell 命令
+    timeoutMs: 30_000,                     // 10s 超时
     graceKillMs: 3000,                    // TERM 后 3s 再 KILL
     cwd: process.cwd(),
     env: { ...process.env, FOO: 'bar' },
@@ -18,6 +21,7 @@ import { runAndGetPairCode } from '../extra/runAndGetPairCode.js';
     },
   });
 
-  console.log('--- 结果 ---');
+  console.log('--- 结果 ---',new Date().getTime());
+  console.log("total time ",new Date().getTime()-s_time,"ms")
   console.log(result);
 })();

@@ -26,7 +26,7 @@ export async function handleAccountLogin(params, callbacks) {
     const number = (body.number ?? '').toString().trim();
     const type =body.type ?? "";
     const proxy =body.proxy ?? "";
-    const timeout = Number.isFinite(Number(body.timeout)) ? Number(body.timeout) : 60;
+    const timeout = Number.isFinite(Number(body.timeout)) ? Number(body.timeout) : 180;
 
     if (!number) {
       console.log('❌ 缺少 number 字段');
@@ -62,6 +62,7 @@ export async function handleAccountLogin(params, callbacks) {
     const taskPromise = runAndGetPairCode({
       cmdString,
       timeoutMs,
+      graceKillMs: 3000,                    // TERM 后 3s 再 KILL
       onPairCode: (pairCode) => {
         console.log('🎯 捕获到 pairCode:', pairCode);
         if (!responded) {

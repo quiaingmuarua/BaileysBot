@@ -26,7 +26,7 @@ export async function handleAccountLogin(params, callbacks) {
     const number = (body.number ?? '').toString().trim();
     const type =body.type ?? "";
     const proxy =body.proxy ?? "";
-    const timeout = Number.isFinite(Number(body.timeout)) ? Number(body.timeout) : 180;
+    const timeout = Number.isFinite(Number(body.timeout)) ? Number(body.timeout) : 240;
 
     if (!number) {
       console.log('❌ 缺少 number 字段');

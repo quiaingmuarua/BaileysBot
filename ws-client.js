@@ -1,6 +1,7 @@
 // ws-client.js - WebSocket 客户端（ESM）
 import WebSocket from 'ws';
 import {getCacheStatus, handleAccountLogin} from './accountHandler.js';
+import {raw} from "express";
 
 const DEFAULTS = {
   RECONNECT: true,
@@ -63,23 +64,25 @@ export class WSAppClient {
 
   /**
    * 发送统一结构消息
-   * @param {string} type
-   * @param {object|null} data
-   * @param {string|null} msgId
-   * @param {string|null} error
-   * @param {number|null} code
+   * @param type {string} type
+   * @param data {object} data
+   * @param rawMsg {object} rawMsg  消息id
    */
-  sendMessage(type, data = null, msgId = null, error = null, code = null, tag = null) {
+  sendMessage(type,data , rawMsg) {
     const payload = {
-      type,
+      type:type,
+      data:data,
       timestamp: new Date().toISOString(),
     };
-    if (msgId) payload.msgId = msgId;
-    if (data !== null) payload.data = data;
-    if (error !== null) payload.error = error;
-    if (code !== null) payload.code = code;
-    if (tag != null) payload.tag = tag;
-    payload.deviceId = deviceId;
+
+    if (rawMsg) {
+     if (rawMsg.msgId !== null) payload.msgId = rawMsg.msgId;
+     if (rawMsg.msgId !== null) payload.msgId = rawMsg.msgId;
+     if (rawMsg.error !==null)  payload.error = rawMsg.error;
+     if (rawMsg.deviceId !==null)   payload.deviceId = rawMsg.deviceId;
+      if (rawMsg.tid !==null)  payload.tid= rawMsg.tid;
+      if (rawMsg.extra !==null)  payload.extra = rawMsg.extra;
+    }
     this._sendRaw(payload);
   }
 
@@ -184,12 +187,12 @@ export class WSAppClient {
     try {
       message = JSON.parse(buffer.toString());
     } catch (err) {
-      this.sendMessage('error', null, null, '消息格式错误');
+      this.sendMessage('error', null, null, {tag:'消息格式错误'});
       this._emit('warn', { reason: 'json_parse_error', raw: buffer.toString() });
       return;
     }
 
-    const { type, data, msgId } = message;
+    const {type, data} = message;
     // 可选：保存服务器分配的 clientId
     if (type === 'connected' && data?.clientId) {
       this._clientId = data.clientId;
@@ -198,41 +201,46 @@ export class WSAppClient {
     switch (type) {
       case 'ping':
         // 收到服务器 ping → 回 pong
-        this.sendMessage('pong', null, msgId);
+        this.sendMessage('pong', null, message);
         break;
 
       case 'get_status':
-        this.sendMessage('status', getCacheStatus(), msgId);
+        this.sendMessage('status', getCacheStatus(), message);
         break;
 
       case 'account_login':
       case 'account_verify':
         // 与服务器版一致：先 ack，再处理
-        this.sendMessage('ack', data, msgId);
-        await this._handleAccountLoginClient(data, msgId,type);
+        this.sendMessage('ack', data, message);
+        await this._handleAccountLoginClient(type,data, message);
         break;
 
       default:
         // 其余类型你也可以继续扩展
-        this.sendMessage('error', null, msgId, `未知的消息类型: ${type}`);
+        this.sendMessage('error', {tag:`未知的消息类型: ${type}`}, message);
         break;
     }
   }
-
-  async _handleAccountLoginClient(params, msgId,type) {
+  /**
+   * @param params {Object} params - 请求参数
+   * @param {object|null} rawMsg
+   * @param type {string}
+   */
+  async _handleAccountLoginClient(type,params, rawMsg) {
     // 复用你现有的 handleAccountLogin，并保持回调协议一致
     params['type']=type
     await handleAccountLogin(params, {
       onResponse: (result) => {
-        this.sendMessage(type, result, msgId);
+        this.sendMessage(type, result, rawMsg);
       },
       onError: (error) => {
         this.sendMessage(
           type,
-          null,
-          msgId,
-          error?.error || 'Internal Server Error',
-          error?.code || 500
+            {
+            error:  error?.error || 'Internal Server Error',
+            code: error?.code || 500
+            },
+            rawMsg,
         );
       },
       onOutput: (chunk, stream) => {
@@ -243,7 +251,7 @@ export class WSAppClient {
               content: String(chunk ?? '').trim(),
               stream,
             },
-            msgId
+            rawMsg
           );
         }
       },

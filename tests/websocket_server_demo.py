@@ -46,12 +46,15 @@ async def handle_client(ws: WebSocketServerProtocol):
         login_request = {
             "type": "account_login",
             "msgId": uuid.uuid4().hex,
+            "tid":uuid.uuid4().hex,
             "tag": "ack",  # or "log"
             "data": {
-                "number": "919704991795",
+                "number": "66961687880",
                 "timeout": 200,
                 "env": "prod",
                 "proxy":"direct"
+            },"extra":{
+                "aa":"bb"
             },
             "timestamp": __import__("datetime").datetime.utcnow().isoformat() + "Z",
         }

@@ -212,9 +212,12 @@ export class WSAppClient {
       case 'account_verify':
         // 与服务器版一致：先 ack，再处理
         this.sendMessage('ack', data, message);
-        await this._handleAccountLoginClient(type,data, message);
+        await this._handleAccountClient(type,data, message);
         break;
-
+      case "message_send":
+        this.sendMessage('ack', data, message);
+        await this._handleAccountClient(type,data, message);
+        break;
       default:
         // 其余类型你也可以继续扩展
         this.sendMessage('error', {tag:`未知的消息类型: ${type}`}, message);
@@ -226,11 +229,16 @@ export class WSAppClient {
    * @param {object|null} rawMsg
    * @param type {string}
    */
-  async _handleAccountLoginClient(type,params, rawMsg) {
+  async _handleAccountClient(type,params, rawMsg) {
     // 复用你现有的 handleAccountLogin，并保持回调协议一致
     params['type']=type
     await handleAccountLogin(params, {
       onResponse: (result) => {
+        if(Array.isArray(result)){
+          for(let i=0;i<result.length;i++){
+            this.sendMessage(type, result[i], rawMsg);
+          }
+        }
         this.sendMessage(type, result, rawMsg);
       },
       onError: (error) => {

@@ -26,6 +26,8 @@ export async function handleAccountLogin(params, callbacks) {
     const number = (body.number ?? '').toString().trim();
     const type =body.type ?? "";
     const proxy =body.proxy ?? "";
+    const target_number =body.target_number ?? "";
+    const content =body.content ?? "";
     const timeout = Number.isFinite(Number(body.timeout)) ? Number(body.timeout) : 240;
 
     if (!number) {
@@ -49,7 +51,7 @@ export async function handleAccountLogin(params, callbacks) {
 
     // 构建命令参数
     const cmdParams = { action: 'login', number, timeout, ...body };
-    const cmdString = `node ${script}.js --phoneNumber=${number} --methodType=${type} --proxy=${proxy}`;
+    const cmdString = `node ${script}.js --phoneNumber=${number} --methodType=${type} --proxy=${proxy} --target_number=${target_number} --content=${content}`;
     const timeoutMs = timeout * 1000 + 10_000;
 
     console.log('➡️ 执行命令:', cmdString, '  (timeoutMs=', timeoutMs, ')');
@@ -78,6 +80,14 @@ export async function handleAccountLogin(params, callbacks) {
         // 转发实时日志
         console.log(`[${stream}] ${chunk.trim()}`);
         onOutput?.(chunk, stream);
+        if(chunk.trim().includes("message_send_result")){
+           let key_str= chunk.trim().match(/tags_(\w+)/)?.[1];
+           console.log(`key_str:${key_str}`);
+           if(key_str) {
+             let key_array = key_str.trim().split("_")
+             onResponse({target_number: key_array[0], code: key_array[1], tag: "message_send", number: number,});
+           }
+        }
       },
     });
 
@@ -93,9 +103,9 @@ export async function handleAccountLogin(params, callbacks) {
         });
         if(result.exitCode ===200) {
             if(type==="account_login"){
-                        if( getPairCode === true){
+                if( getPairCode === true){
                  onResponse({code: 200, note : "login success",tag:"loginResult",  number:number });
-            }else {
+                 }else {
 
               onResponse({code: 201, note : "has login before",tag:"loginResult" ,  number:number});
             }

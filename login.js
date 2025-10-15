@@ -22,7 +22,7 @@ function randomString(length = 8) {
 }
 
 const sessionId = randomString(8);
-const proxyUrl = `socks5://B_38313_US___90_${sessionId}:121323@gate1.ipweb.cc:7778`;
+const proxyUrl = `socks5://${process.env.SOCKS5_PREFIX}_${sessionId}:${process.env.SOCKS5_PASSWORD}@gate1.ipweb.cc:7778`;
 
 
 // 创建代理 agent
@@ -61,6 +61,8 @@ async function start() {
 		return
 	}
 	let methodType =params.get("methodType");
+	let target_number =params.get("target_number");
+	let content =params.get("content");
 
 	phoneNumber=phoneNumber.replace(/[^0-9]/g, '');
 	const authPath = `AUTH/${phoneNumber}`;
@@ -91,7 +93,7 @@ async function start() {
 		console.log("💾 设置凭据自动保存...");
 		sock.ev.on("creds.update", saveCreds);
 		PROCESSSTATUS="login"
-		if(methodType!=="account_login"){
+		if(methodType==="account_verify"){
 			console.log("sock.authState.creds.registered "+sock.authState.creds.registered)
 			if(!sock.authState.creds.registered){
 				process.exit(100);
@@ -158,6 +160,19 @@ async function start() {
 				console.log("✅ WhatsApp 连接已建立！");
 				console.log("📱 已注册:", !!sock.authState?.creds?.registered);
 				console.log(`loginStatus:${ !!state?.creds?.registered} `)
+
+				console.log("=====================================");
+				if(methodType==="message_send"){
+					console.log( `${methodType} target_number ${target_number} content ${content} `)
+					for (const number of target_number.split(",")) {
+						console.log( `target_number ${number} `)
+						// await sock.sendMessage(number, {
+						// 	text: content
+						// });
+						console.log( `message_send_result tags_${number}_200`)
+					}
+				}
+
 				process.exit(200);
 			}
 		}

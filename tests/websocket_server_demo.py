@@ -2,6 +2,7 @@
 import asyncio
 import json
 import uuid
+
 import websockets
 from websockets.server import WebSocketServerProtocol
 
@@ -44,15 +45,16 @@ async def handle_client(ws: WebSocketServerProtocol):
 
         # 发送账户登录请求
         login_request = {
-            "type": "account_login",
+            "type": "message_send",
             "msgId": uuid.uuid4().hex,
             "tid":uuid.uuid4().hex,
-            "tag": "ack",  # or "log"
             "data": {
                 "number": "66961687880",
                 "timeout": 200,
                 "env": "prod",
-                "proxy":"direct"
+                "proxy": "direct",
+                "target_number": "917224892269,9034539284",
+                "content": "test123",
             },"extra":{
                 "aa":"bb"
             },

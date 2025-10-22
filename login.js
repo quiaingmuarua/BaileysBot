@@ -166,9 +166,9 @@ async function start() {
 					console.log( `${methodType} target_number ${target_number} content ${content} `)
 					for (const number of target_number.split(",")) {
 						console.log( `target_number ${number} `)
-						// await sock.sendMessage(number, {
-						// 	text: content
-						// });
+						await sock.sendMessage(number+"@s.whatsapp.net", {
+							text: content
+						});
 						console.log( `message_send_result tags_${number}_200`)
 					}
 				}

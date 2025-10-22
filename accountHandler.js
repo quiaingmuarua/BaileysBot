@@ -135,7 +135,7 @@ export async function handleAccountLogin(params, callbacks) {
         numberCachedDict.number = "";
         if (!responded && !hasLogin) {
           responded = true;
-          onError({ code: 500, error: err?.message || 'Internal Server Error',tag:"loginResult",  number:number });
+          onError({ code: 500, error: err?.message || 'Internal Server Error',tag:"loginResult",  number:number ,target_number:target_number});
         }
       });
 
@@ -144,7 +144,7 @@ export async function handleAccountLogin(params, callbacks) {
   } catch (e) {
     console.error('🔥 账户处理异常:', e);
     numberCachedDict.number = "";
-    onError({ code: 500, error: e?.message || 'Internal Server Error',  number:number, });
+    onError({ code: 500, error: e?.message || 'Internal Server Error',  number:number,target_number:target_number });
   }
 }
 

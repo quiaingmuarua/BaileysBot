@@ -30,3 +30,4 @@ AUTH/*
 store.json
 /__pycache__
 baileys
+tests/numbers.txt

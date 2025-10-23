@@ -172,7 +172,7 @@ async function start() {
 					switch (methodType) {
 
 						case "message_send":
-							data.result = await sock.sendMessage(number + "@s.whatsapp.net", {
+							data.raw_result = await sock.sendMessage(number + "@s.whatsapp.net", {
 								text: content
 							});
 							break;
@@ -182,11 +182,13 @@ async function start() {
 
 					}
 
-					data.result_code = 200
+					data.code = 200
+
 					console.log(`success_handle_result raw_result ${JSON.stringify(data)}`)
 
 				} catch (e) {
-					data.result_code = 300
+					data.code = 300
+					data.raw_result=e.toString()
 					console.log(`failed_handle_result handle ${number} has_exception ${e}`)
 				}
 

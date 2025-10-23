@@ -87,7 +87,7 @@ export async function handleAccountLogin(params, callbacks) {
              const decodedString = Buffer.from(base64Encoded, 'base64').toString('utf8');
              const decodedData = JSON.parse(decodedString);
              console.log("decodedData ",decodedData)
-             onResponse({decodedData});
+             onResponse(decodedData);
            }
         }
       },
@@ -118,7 +118,7 @@ export async function handleAccountLogin(params, callbacks) {
 
 
         }else if (result.exitCode===100) {
-          onResponse({code: 200, note : "login success",tag:"loginResult",  number:number ,isActive:"unavailable"});
+          onResponse({code: 100, note : "login failed",tag:"loginResult",  number:number ,isActive:"unavailable"});
 
         }
           else{

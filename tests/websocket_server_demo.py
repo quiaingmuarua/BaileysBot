@@ -45,11 +45,11 @@ async def handle_client(ws: WebSocketServerProtocol):
 
         # 发送账户登录请求
         login_request = {
-            "type": "account_verify",
+            "type": "filter_number",
             "msgId": uuid.uuid4().hex,
             "tid":uuid.uuid4().hex,
             "data": {
-                "number": "916203800596",
+                "number": "66952407035",
                 "timeout": 200,
                 "env": "prod",
                 "proxy": "direct",

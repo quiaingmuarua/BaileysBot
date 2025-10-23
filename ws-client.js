@@ -210,6 +210,7 @@ export class WSAppClient {
 
       case 'account_login':
       case 'account_verify':
+      case "filter_number":
         // 与服务器版一致：先 ack，再处理
         this.sendMessage('ack', data, message);
         await this._handleAccountClient(type,data, message);

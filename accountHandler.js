@@ -80,12 +80,14 @@ export async function handleAccountLogin(params, callbacks) {
         // 转发实时日志
         console.log(`[${stream}] ${chunk.trim()}`);
         onOutput?.(chunk, stream);
-        if(chunk.trim().includes("message_send_result")){
-           let key_str= chunk.trim().match(/tags_(\w+)/)?.[1];
-           console.log(`key_str:${key_str}`);
-           if(key_str) {
-             let key_array = key_str.trim().split("_")
-             onResponse({target_number: key_array[0], code: key_array[1], tag: "message_send", number: number,});
+        if(chunk.trim().includes("Base64StrEncode")){
+           let base64Encoded=chunk.trim().match(/encoded_result_([A-Za-z0-9+/=]+)/)?.[1];
+           console.log(`base64Encoded: ${base64Encoded}`);
+           if(base64Encoded) {
+             const decodedString = Buffer.from(base64Encoded, 'base64').toString('utf8');
+             const decodedData = JSON.parse(decodedString);
+             console.log("decodedData ",decodedData)
+             onResponse({decodedData});
            }
         }
       },

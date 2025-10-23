@@ -1,15 +1,15 @@
 import makeWASocket, {
+	Browsers,
 	fetchLatestBaileysVersion,
 	makeCacheableSignalKeyStore,
 	useMultiFileAuthState,
-	Browsers,
-	DisconnectReason,
 } from "./baileys/lib/index.js";
 import pino from "pino";
 import NodeCache from "node-cache";
 import readline from "readline";
 import fs from "fs";
-import { SocksProxyAgent } from 'socks-proxy-agent'
+import {SocksProxyAgent} from 'socks-proxy-agent'
+
 // Removed maxRetries - using simple reconnection like mini_example
 
 function randomString(length = 8) {
@@ -121,61 +121,85 @@ async function start() {
 	// 处理连接状态更新
 	sock.ev.process(async events => {
 		// 处理连接状态更新
-		if (events["connection.update"]) {
-			const update = events["connection.update"];
-			const { connection, lastDisconnect, qr } = update;
+		if (!events["connection.update"]) {
+			return;
+		}
+		const update = events["connection.update"];
+		const {connection, lastDisconnect, qr} = update;
+		console.log("🔄 连接状态更新事件:");
+		console.log("   connection:", connection);
+		console.log("   qr:", !!qr);
+		console.log("   lastDisconnect:", lastDisconnect);
+		if (connection === "connecting") {
+			console.log("🔗 正在连接到 WhatsApp...");
+		}
+		if (connection === "close") {
+			console.log("❌ 连接关闭:", lastDisconnect?.error);
+			if (
+				lastDisconnect &&
+				lastDisconnect.error
+				// &&
+				// lastDisconnect.error.output &&
+				// lastDisconnect.error.output.statusCode !== DisconnectReason.loggedOut
+			) {
+				console.log("🔄 连接已断开，正在重新连接... ", lastDisconnect?.error?.output?.statusCode);
+				max_retry_cnt -= 1
+				if (max_retry_cnt < 0) {
 
-			console.log("🔄 连接状态更新事件:");
-			console.log("   connection:", connection);
-			console.log("   qr:", !!qr);
-			console.log("   lastDisconnect:", lastDisconnect);
-
-			if (connection === "connecting") {
-				console.log("🔗 正在连接到 WhatsApp...");
+					throw new Error("max_retry_cnt is 0, please check your network")
+				}
+				if (lastDisconnect?.error?.output?.statusCode === 401) {
+					fs.rmSync(authPath, {recursive: true, force: true});
+				}
+				start();
+			} else {
+				console.log("🛑 连接已关闭，您已登出。");
 			}
+		} else if (connection === "open") {
+			console.log("✅ WhatsApp 连接已建立！");
+			console.log("📱 已注册:", !!sock.authState?.creds?.registered);
+			console.log(`loginStatus:${!!state?.creds?.registered} `)
 
-			if (connection === "close") {
-				console.log("❌ 连接关闭:", lastDisconnect?.error);
-				if (
-					lastDisconnect &&
-					lastDisconnect.error
-					// &&
-					// lastDisconnect.error.output &&
-					// lastDisconnect.error.output.statusCode !== DisconnectReason.loggedOut
-				) {
-					console.log("🔄 连接已断开，正在重新连接... " ,lastDisconnect?.error?.output?.statusCode);
-					max_retry_cnt-=1
-					if(max_retry_cnt<0){
+			console.log("=====================================");
 
-						throw new Error("max_retry_cnt is 0, please check your network")
-					}
-					if(lastDisconnect?.error?.output?.statusCode===401){
-							fs.rmSync(authPath, { recursive: true, force: true });
-					}
-					start();
-				} else {
-					console.log("🛑 连接已关闭，您已登出。");
-				}
-			} else if (connection === "open") {
-				console.log("✅ WhatsApp 连接已建立！");
-				console.log("📱 已注册:", !!sock.authState?.creds?.registered);
-				console.log(`loginStatus:${ !!state?.creds?.registered} `)
-
-				console.log("=====================================");
-				if(methodType==="message_send"){
-					console.log( `${methodType} target_number ${target_number} content ${content} `)
-					for (const number of target_number.split(",")) {
-						console.log( `target_number ${number} `)
-						await sock.sendMessage(number+"@s.whatsapp.net", {
-							text: content
-						});
-						console.log( `message_send_result tags_${number}_200`)
-					}
-				}
-
+			console.log(`${methodType} target_number ${target_number} content ${content} `)
+			if(!target_number ||target_number.length ===0){
 				process.exit(200);
 			}
-		}
+			for (const number of target_number.split(",")) {
+				let data = {number, target_number, methodType}
+				try {
+					switch (methodType) {
+
+						case "message_send":
+							data.result = await sock.sendMessage(number + "@s.whatsapp.net", {
+								text: content
+							});
+							break;
+						case "filter_number":
+							data.result = await sock.profilePictureUrl(`${number}@s.whatsapp.net`, "image")
+							break
+
+					}
+
+					data.result_code = 200
+					console.log(`success_handle_result raw_result ${JSON.stringify(data)}`)
+
+				} catch (e) {
+					data.result_code = 300
+					console.log(`failed_handle_result handle ${number} has_exception ${e}`)
+				}
+
+				const jsonString = JSON.stringify(data);
+				const base64Encoded = Buffer.from(jsonString, 'utf8').toString('base64');
+				console.log(`Base64StrEncode encoded_result_${base64Encoded}`)
+
+			}
+
+			process.exit(200);
+
+	}
+
 
 		// 处理接收到的消息
 		if (events["messages.upsert"]) {

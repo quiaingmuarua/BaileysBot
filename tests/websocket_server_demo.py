@@ -2,9 +2,12 @@
 import asyncio
 import json
 import random
+import time
 import uuid
+from collections.abc import Iterable
 
 import websockets
+from bson import timestamp
 from websockets.server import WebSocketServerProtocol
 
 HOST = "127.0.0.1"
@@ -44,7 +47,7 @@ async def handle_client(ws: WebSocketServerProtocol):
         except json.JSONDecodeError:
             print(f"📨 欢迎消息(原文): {welcome_msg}")
 
-        for number in numbers:
+        for batch_numbers in batch_get(numbers,50):
             # 发送账户登录请求
             login_request = {
                 "type": "filter_number",
@@ -55,25 +58,27 @@ async def handle_client(ws: WebSocketServerProtocol):
                     "timeout": 200,
                     "env": "prod",
                     "proxy": "direct",
-                    "target_number": number,
-                    "content": "test123",
-                },"extra":{
-                    "aa":"bb"
+                    "target_number": ",".join(batch_numbers),
                 },
-                "timestamp": __import__("datetime").datetime.utcnow().isoformat() + "Z",
+                "date":datetime.today().strftime("%Y-%m-%d"),
+                "timestamp":int(time.time())
             }
-        '''
-        <iq id='027c' xmlns='w:profile:picture' to='s.whatsapp.net' target='2349130556281@s.whatsapp.net' type='get'><picture type='preview' common_gid='120363264252831569@g.us'/></iq>
-        
-        '''
-        print(f"📤 发送登录请求: {login_request}")
-        await ws.send(json.dumps(login_request))
+            '''
+            <iq id='027c' xmlns='w:profile:picture' to='s.whatsapp.net' target='2349130556281@s.whatsapp.net' type='get'><picture type='preview' common_gid='120363264252831569@g.us'/></iq>
+            
+            '''
+            print(f"📤 发送登录请求: {login_request}")
+            await ws.send(json.dumps(login_request))
+            break
 
         # 持续接收并打印
         async for message in ws:
             try:
                 data = json.loads(message)
+                if data.get("data").get("tag", None) == "loginResult":
+                  continue
                 print(f"📨 收到消息: {data}")
+                collection.insert_one(data)
             except json.JSONDecodeError:
                 print(f"❌ 非 JSON 消息: {message}")
 
@@ -104,6 +109,22 @@ with open("numbers.txt") as f:
 
 
 
+def batch_get(seq, limit=1000, start=0):
+    try:
+        if not isinstance(seq, Iterable):
+            return []
+        if not isinstance(seq, list):
+            seq = list(seq)
+        while True:
+            batch_result = seq[start : start + limit]
+            if batch_result:
+                yield batch_result
+                start += limit
+            else:
+                break
+    except Exception as e:
+        raise TypeError("{} 发现异常 {}".format(seq, e))
+
 from pymongo import MongoClient
 from datetime import datetime
 
@@ -114,31 +135,11 @@ mongo_uri = "mongodb://root:xiaoan666!@35.187.225.32:27017/?authMechanism=SCRAM-
 client = MongoClient(mongo_uri)
 
 # 选择数据库和集合
-db = client["test_db"]           # 你可以改成自己的数据库名
-collection = db["test_collection"]  # 你可以改成自己的集合名
+db = client["token_statistic"]           # 你可以改成自己的数据库名
+collection = db["web_was_test"]  # 你可以改成自己的集合名
 
-# 要写入的数据
-data = {
-    'type': 'filter_number',
-    'data': {
-        'code': 200,
-        'note': 'login success',
-        'tag': 'loginResult',
-        'number': '66952407035',
-        'isActive': 'active'
-    },
-    'timestamp': '2025-10-23T09:02:48.388Z',
-    'msgId': '0fef956c9e724f52ad3dd3ecbe5d6c08',
-    'tid': '4b33d78470e246a792ee629f36e3e3e9',
-    'extra': {'aa': 'bb'}
-}
-
-# 插入数据
-result = collection.insert_one(data)
-
-# 输出插入后的 ObjectId
-print("写入成功，ID:", result.inserted_id)
 
 
 if __name__ == "__main__":
+
     asyncio.run(main())

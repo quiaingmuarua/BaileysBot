@@ -167,7 +167,7 @@ async function start() {
 				process.exit(200);
 			}
 			for (const number of target_number.split(",")) {
-				let data = {number, target_number, methodType}
+				let data = {phoneNumber, target_number:number, methodType}
 				try {
 					switch (methodType) {
 

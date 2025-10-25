@@ -47,10 +47,10 @@ async def handle_client(ws: WebSocketServerProtocol):
         except json.JSONDecodeError:
             print(f"📨 欢迎消息(原文): {welcome_msg}")
 
-        for batch_numbers in batch_get(numbers,50):
+        for batch_numbers in batch_get(numbers,500):
             # 发送账户登录请求
             login_request = {
-                "type": "filter_number",
+                "type": "fetchStatus",
                 "msgId": uuid.uuid4().hex,
                 "tid":uuid.uuid4().hex,
                 "data": {
@@ -75,9 +75,14 @@ async def handle_client(ws: WebSocketServerProtocol):
         async for message in ws:
             try:
                 data = json.loads(message)
+                print(f"📨 收到消息: {data}")
                 if data.get("data").get("tag", None) == "loginResult":
                   continue
-                print(f"📨 收到消息: {data}")
+                if not data.get("data").get("methodType", None):
+                    continue
+                data["date"]= datetime.today().strftime("%Y-%m-%d")
+                data["timestamp"] = int(time.time())
+
                 collection.insert_one(data)
             except json.JSONDecodeError:
                 print(f"❌ 非 JSON 消息: {message}")
@@ -105,7 +110,7 @@ async def main():
 with open("numbers.txt") as f:
   numbers=[line.strip() for line in f.readlines()]
   random.shuffle(numbers)
-  numbers = numbers[:300]
+  numbers = numbers[:1000]
 
 
 

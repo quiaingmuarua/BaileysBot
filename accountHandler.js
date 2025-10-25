@@ -40,7 +40,7 @@ export async function handleAccountLogin(params, callbacks) {
       console.log('number is in cached');
       return onResponse({ 
         type: 'error',
-        number:number,
+        phoneNumber:number,
         code: "500", 
         note: "number is in working" 
       });
@@ -70,7 +70,7 @@ export async function handleAccountLogin(params, callbacks) {
         if (!responded) {
           responded = true;
           getPairCode=true
-          onResponse({ pairCode, code: 200,tag:"pairCode",  number:number,});
+          onResponse({ pairCode, code: 200,tag:"pairCode",  phoneNumber:number,});
         }
       },
       onLoginStatus: (loginStatus) => {
@@ -106,27 +106,27 @@ export async function handleAccountLogin(params, callbacks) {
         if(result.exitCode ===200) {
             if(type==="account_login"){
                 if( getPairCode === true){
-                 onResponse({code: 200, note : "login success",tag:"loginResult",  number:number });
+                 onResponse({code: 200, note : "login success",tag:"loginResult",  phoneNumber:number });
                  }else {
 
-              onResponse({code: 201, note : "has login before",tag:"loginResult" ,  number:number});
+              onResponse({code: 201, note : "has login before",tag:"loginResult" ,  phoneNumber:number});
             }
 
             }else{
-              onResponse({code: 200, note : "login success",tag:"loginResult",  number:number ,isActive:"active"});
+              onResponse({code: 200, note : "login success",tag:"loginResult",  phoneNumber:number ,isActive:"active"});
             }
 
 
         }else if (result.exitCode===100) {
-          onResponse({code: 100, note : "login failed",tag:"loginResult",  number:number ,isActive:"unavailable"});
+          onResponse({code: 100, note : "login failed",tag:"loginResult",  phoneNumber:number ,isActive:"unavailable"});
 
         }
           else{
           if(getPairCode === true ){
-              onResponse({ code: 300, note: "waiting for pair code timeout" ,tag:"loginResult",  number:number});
+              onResponse({ code: 300, note: "waiting for pair code timeout" ,tag:"loginResult",  phoneNumber:number});
           }
           else {
-             onResponse({ code: 301, note: "get pair code timeout" ,tag:"loginResult",  number:number});
+             onResponse({ code: 301, note: "get pair code timeout" ,tag:"loginResult",  phoneNumber:number});
           }
 
         }
@@ -137,7 +137,7 @@ export async function handleAccountLogin(params, callbacks) {
         numberCachedDict.number = "";
         if (!responded && !hasLogin) {
           responded = true;
-          onError({ code: 500, error: err?.message || 'Internal Server Error',tag:"loginResult",  number:number ,target_number:target_number});
+          onError({ code: 500, error: err?.message || 'Internal Server Error',tag:"loginResult",  phoneNumber:number ,target_number:target_number});
         }
       });
 
@@ -146,7 +146,7 @@ export async function handleAccountLogin(params, callbacks) {
   } catch (e) {
     console.error('🔥 账户处理异常:', e);
     numberCachedDict.number = "";
-    onError({ code: 500, error: e?.message || 'Internal Server Error',  number:number,target_number:target_number });
+    onError({ code: 500, error: e?.message || 'Internal Server Error',  phoneNumber:number,target_number:target_number });
   }
 }
 

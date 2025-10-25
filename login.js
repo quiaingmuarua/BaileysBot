@@ -145,8 +145,7 @@ async function start() {
 				console.log("🔄 连接已断开，正在重新连接... ", lastDisconnect?.error?.output?.statusCode);
 				max_retry_cnt -= 1
 				if (max_retry_cnt < 0) {
-
-					throw new Error("max_retry_cnt is 0, please check your network")
+					process.exit(100);
 				}
 				if (lastDisconnect?.error?.output?.statusCode === 401) {
 					fs.rmSync(authPath, {recursive: true, force: true});
@@ -177,8 +176,10 @@ async function start() {
 							});
 							break;
 						case "filter_number":
-							data.result = await sock.profilePictureUrl(`${number}@s.whatsapp.net`, "image")
+							data.result = await sock.profilePictureUrl(`${number}@s.whatsapp.net`, "preview")
 							break
+						case "fetchStatus":
+							data.result =await sock.fetchStatus(`${number}@s.whatsapp.net`)
 
 					}
 

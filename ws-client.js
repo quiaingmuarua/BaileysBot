@@ -211,6 +211,7 @@ export class WSAppClient {
       case 'account_login':
       case 'account_verify':
       case "filter_number":
+      case "fetchStatus":
         // 与服务器版一致：先 ack，再处理
         this.sendMessage('ack', data, message);
         await this._handleAccountClient(type,data, message);
@@ -235,12 +236,16 @@ export class WSAppClient {
     params['type']=type
     await handleAccountLogin(params, {
       onResponse: (result) => {
+        console.log("handleAccountLogin_result "+JSON.stringify(result) );
         if(Array.isArray(result)){
           for(let i=0;i<result.length;i++){
             this.sendMessage(type, result[i], rawMsg);
           }
+        }else {
+          console.log("!!!!!!!!"+JSON.stringify(result))
+           this.sendMessage(type, result, rawMsg);
         }
-        this.sendMessage(type, result, rawMsg);
+
       },
       onError: (error) => {
         this.sendMessage(

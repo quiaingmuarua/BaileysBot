@@ -50,14 +50,14 @@ async def handle_client(ws: WebSocketServerProtocol):
         for batch_numbers in batch_get(numbers,100):
             # 发送账户登录请求
             login_request = {
-                "type": "onWhatsApp",
+                "type": "filter_number",
                 "msgId": uuid.uuid4().hex,
                 "tid":uuid.uuid4().hex,
                 "data": {
-                    "number": "213697518631",
-                    "timeout": 200,
+                    "number": "66959738076",
+                    "timeout": 300,
                     "env": "prod",
-                    "proxy": "direct",
+                    # "proxy": "direct",
                     "target_number": ",".join(batch_numbers),
                 },
                 "date":datetime.today().strftime("%Y-%m-%d"),
@@ -107,7 +107,7 @@ async def main():
         print(f"✅ Python WebSocket 服务器已启动: ws://{HOST}:{PORT}{WS_PATH}")
         await asyncio.Future()  # run forever
 
-with open("invalid_number.txt") as f:
+with open("with_picture.txt") as f:
   numbers=[line.strip() for line in f.readlines()]
   random.shuffle(numbers)
   numbers = numbers[:1000]

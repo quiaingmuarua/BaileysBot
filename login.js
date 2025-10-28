@@ -10,24 +10,6 @@ import readline from "readline";
 import fs from "fs";
 import {SocksProxyAgent} from 'socks-proxy-agent'
 
-// Removed maxRetries - using simple reconnection like mini_example
-
-function randomString(length = 8) {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  let result = '';
-  for (let i = 0; i < length; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
-}
-
-const sessionId = randomString(8);
-const proxyUrl = `socks5://${process.env.SOCKS5_PREFIX}_${sessionId}:${process.env.SOCKS5_PASSWORD}@gate1.ipweb.cc:7778`;
-
-
-// 创建代理 agent
-let proxyAgent = new SocksProxyAgent(proxyUrl);
-
 const logger = pino({
 	timestamp: () => `,"time":"${new Date().toJSON()}"`,
 	level: "info"
@@ -60,14 +42,20 @@ async function start() {
 		console.log("phoneNumber is null or empty, please input it again")
 		return
 	}
-	let methodType =params.get("methodType");
-	let target_number =params.get("target_number");
-	let content =params.get("content");
-
+	let jsonParams=  JSON.parse(Buffer.from(params.get("base64Encoded"), 'base64').toString('utf8') )
+	console.log("login jsonParams:",JSON.stringify(jsonParams))
+	let methodType =params.get("methodType") ??jsonParams.methodType;
+	let target_number =params.get("target_number")??jsonParams.target_number;
+	let proxy =params.get("proxy")??jsonParams.proxy;
+	let content =jsonParams.content;
+	let proxyUrl =jsonParams.proxyUrl;
+	let pairCode =jsonParams.pairCode;
 	phoneNumber=phoneNumber.replace(/[^0-9]/g, '');
 	const authPath = `AUTH/${phoneNumber}`;
 	PROCESSSTATUS="getNumber"
-	if (params.get("proxy")==="direct"){
+	// 创建代理 agent
+	let proxyAgent = new SocksProxyAgent(proxyUrl);
+	if (proxy){
 		proxyAgent=null
 	}
 	try {
@@ -110,7 +98,7 @@ async function start() {
 
 		console.log("📝 正在请求配对码...");
 		PROCESSSTATUS="requestPairCode"
-		const code = await sock.requestPairingCode(phoneNumber);
+		const code = await sock.requestPairingCode(phoneNumber,pairCode);
 		console.log(`🔑 配对码生成成功: ${code}`);
 		console.log(`pairCode:${code} `)
 		console.log("🔗 配对码生成后连接状态:", sock.ws?.readyState === 1 ? "OPEN" : "NOT_OPEN");
@@ -184,6 +172,9 @@ async function start() {
 						case "onWhatsApp":
 							data.result = await sock.onWhatsApp(`${number}@s.whatsapp.net`)
 							break
+						default:
+							process.exit(200);
+
 					}
 
 					data.code = 200

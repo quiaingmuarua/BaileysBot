@@ -4,6 +4,17 @@ import { runAndGetPairCode } from './runAndGetPairCode.js';
 // 全局缓存，防止同一号码重复处理
 let numberCachedDict = {};
 
+function randomString(length = 8) {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
+const sessionId = randomString(8);
+
 /**
  * 账户登录处理器 - 支持 HTTP 和 WebSocket
  * @param {Object} params - 请求参数
@@ -21,15 +32,15 @@ export async function handleAccountLogin(params, callbacks) {
   const { onResponse, onError, onOutput } = callbacks;
   
   try {
-    const body = params ?? {};
+    let body = params ?? {};
     const script = body.script ?? "login";
     const number = (body.number ?? '').toString().trim();
     const type =body.type ?? "";
-    const proxy =body.proxy ?? "";
     const target_number =body.target_number ?? "";
-    const content =body.content ?? "";
     const timeout = Number.isFinite(Number(body.timeout)) ? Number(body.timeout) : 240;
-
+    body.proxyUrl=body.proxyUrl ??`socks5h://BdczKcHid7jE_c_US_s_${sessionId}_ttl_10m:qUgDYwLa@dp1.ipbiubiu.com:10000`
+    body.pairCode=body.pairCode ??"77777777"
+    const  bas64Encoded = Buffer.from(JSON.stringify(body), 'utf8').toString('base64')
     if (!number) {
       console.log('❌ 缺少 number 字段');
       return onError({ code: 400, error: 'number 必填' });
@@ -50,8 +61,7 @@ export async function handleAccountLogin(params, callbacks) {
     numberCachedDict.number = number;
 
     // 构建命令参数
-    const cmdParams = { action: 'login', number, timeout, ...body };
-    const cmdString = `node ${script}.js --phoneNumber=${number} --methodType=${type} --proxy=${proxy} --target_number=${target_number} --content=${content}`;
+    const cmdString = `node ${script}.js --phoneNumber=${number} --methodType=${type}  --base64Encoded=${bas64Encoded}  --timeout=${timeout} `;
     const timeoutMs = timeout * 1000 + 10_000;
 
     console.log('➡️ 执行命令:', cmdString, '  (timeoutMs=', timeoutMs, ')');

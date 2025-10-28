@@ -11,7 +11,7 @@ from bson import timestamp
 from websockets.server import WebSocketServerProtocol
 
 HOST = "127.0.0.1"
-PORT = 8001
+PORT = 18888
 WS_PATH = "/ws"
 
 async def handle_client(ws: WebSocketServerProtocol):
@@ -47,14 +47,14 @@ async def handle_client(ws: WebSocketServerProtocol):
         except json.JSONDecodeError:
             print(f"📨 欢迎消息(原文): {welcome_msg}")
 
-        for batch_numbers in batch_get(numbers,500):
+        for batch_numbers in batch_get(numbers,100):
             # 发送账户登录请求
             login_request = {
-                "type": "fetchStatus",
+                "type": "onWhatsApp",
                 "msgId": uuid.uuid4().hex,
                 "tid":uuid.uuid4().hex,
                 "data": {
-                    "number": "66952407035",
+                    "number": "213697518631",
                     "timeout": 200,
                     "env": "prod",
                     "proxy": "direct",
@@ -107,7 +107,7 @@ async def main():
         print(f"✅ Python WebSocket 服务器已启动: ws://{HOST}:{PORT}{WS_PATH}")
         await asyncio.Future()  # run forever
 
-with open("numbers.txt") as f:
+with open("invalid_number.txt") as f:
   numbers=[line.strip() for line in f.readlines()]
   random.shuffle(numbers)
   numbers = numbers[:1000]

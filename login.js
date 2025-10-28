@@ -180,11 +180,13 @@ async function start() {
 							break
 						case "fetchStatus":
 							data.result =await sock.fetchStatus(`${number}@s.whatsapp.net`)
-
+							break
+						case "onWhatsApp":
+							data.result = await sock.onWhatsApp(`${number}@s.whatsapp.net`)
+							break
 					}
 
 					data.code = 200
-
 					console.log(`success_handle_result raw_result ${JSON.stringify(data)}`)
 
 				} catch (e) {

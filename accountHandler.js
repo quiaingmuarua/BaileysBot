@@ -70,7 +70,12 @@ export async function handleAccountLogin(params, callbacks) {
         if (!responded) {
           responded = true;
           getPairCode=true
-          onResponse({ pairCode, code: 200,tag:"pairCode",  phoneNumber:number,});
+          if(type==="account_login"){
+               onResponse({ pairCode, code: 200,tag:"pairCode",  phoneNumber:number,});
+          }else {
+             onResponse({code: 101, note : "login failed, account logout",tag:"loginResult",  phoneNumber:number ,isActive:"unavailable"});
+          }
+
         }
       },
       onLoginStatus: (loginStatus) => {
@@ -86,6 +91,7 @@ export async function handleAccountLogin(params, callbacks) {
            if(base64Encoded) {
              const decodedString = Buffer.from(base64Encoded, 'base64').toString('utf8');
              const decodedData = JSON.parse(decodedString);
+             decodedData.tag="actionResult";
              console.log("decodedData ",decodedData)
              onResponse(decodedData);
            }
@@ -118,7 +124,7 @@ export async function handleAccountLogin(params, callbacks) {
 
 
         }else if (result.exitCode===100) {
-          onResponse({code: 100, note : "login failed",tag:"loginResult",  phoneNumber:number ,isActive:"unavailable"});
+          onResponse({code: 100, note : "login failed,account banned",tag:"loginResult",  phoneNumber:number ,isActive:"unavailable"});
 
         }
           else{
@@ -146,7 +152,7 @@ export async function handleAccountLogin(params, callbacks) {
   } catch (e) {
     console.error('🔥 账户处理异常:', e);
     numberCachedDict.number = "";
-    onError({ code: 500, error: e?.message || 'Internal Server Error',  phoneNumber:number,target_number:target_number });
+    onError({ code: 500, error: e?.message || 'Internal Server Error',tag:"loginResult",  phoneNumber:number,target_number:target_number });
   }
 }
 

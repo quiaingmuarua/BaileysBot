@@ -1,11 +1,12 @@
 // index.js - 启动 WebSocket 客户端
 import { WSAppClient } from './ws-client.js';
-
+const deviceId = process.env.DEVICE_ID || 'wabot_unknown';
+console.log('Device ID:', deviceId);
 // const WS_URL = process.env.WS_URL || 'ws://192.168.3.65:8088/ws';
-// const WS_URL = process.env.WS_URL || 'ws://192.168.3.65:8088/ws';
-const WS_URL = process.env.WS_URL ||  'ws://127.0.0.1:18888/ws';
+// const WS_URL = process.env.WS_URL || 'ws://192.168.3.65:8088/ws/';
+const WS_URL = process.env.WS_URL ||  'ws://127.0.0.1:18888/ws/';
 
-const client = new WSAppClient(WS_URL, {
+const client = new WSAppClient(WS_URL+deviceId, {
   reconnect: true,
   reconnectBase: 1000,
   reconnectMax: 15000,

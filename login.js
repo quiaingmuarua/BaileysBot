@@ -28,7 +28,7 @@ const P = pino({
 	level: "silent",
 });
 let PROCESSSTATUS="init"
-let max_retry_cnt=5
+let max_retry_cnt=3
 
 const args = process.argv.slice(2).join("&").replace(/--/g, "");
 
@@ -46,7 +46,7 @@ async function start() {
 	console.log("login jsonParams:",JSON.stringify(jsonParams))
 	let methodType =params.get("methodType") ??jsonParams.methodType;
 	let target_number =params.get("target_number")??jsonParams.target_number;
-	let proxy =params.get("proxy")??jsonParams.proxy;
+	let proxy =params.get("proxy")||jsonParams.proxy;
 	let content =jsonParams.content;
 	let proxyUrl =jsonParams.proxyUrl;
 	let pairCode =jsonParams.pairCode;
@@ -55,7 +55,8 @@ async function start() {
 	PROCESSSTATUS="getNumber"
 	// 创建代理 agent
 	let proxyAgent = new SocksProxyAgent(proxyUrl);
-	if (proxy){
+	if (proxy==="direct"){
+		console.log("direct login")
 		proxyAgent=null
 	}
 	try {
@@ -93,6 +94,10 @@ async function start() {
 		console.log("🔍 账号未注册，开始配对流程...");
 		//await 5s
 		await new Promise(resolve => setTimeout(resolve, 5000));
+		if(methodType !=="account_login"){
+			process.exit(100);
+		}
+
 		console.log(`📞 手机号: ${phoneNumber}`);
 		console.log("🔗 当前连接状态:", sock.ws?.readyState === 1 ? "OPEN" : "NOT_OPEN");
 
@@ -159,18 +164,18 @@ async function start() {
 					switch (methodType) {
 
 						case "message_send":
-							data.raw_result = await sock.sendMessage(number + "@s.whatsapp.net", {
+							data.result = await sock.sendMessage(number + "@s.whatsapp.net", {
 								text: content
 							});
 							break;
 						case "filter_number":
-							data.result = await sock.profilePictureUrl(`${number}@s.whatsapp.net`, "preview")
+							data.result = await sock.profilePictureUrl(`${number}@s.whatsapp.net`, "image")
 							break
 						case "fetchStatus":
-							data.result =await sock.fetchStatus(`${number}@s.whatsapp.net`)
+							data.result = await sock.fetchStatus(...number.split("|").map(item => `${item}@s.whatsapp.net`))
 							break
 						case "onWhatsApp":
-							data.result = await sock.onWhatsApp(`${number}@s.whatsapp.net`)
+							data.result = await sock.onWhatsApp(...number.split("|").map(item => `${item}@s.whatsapp.net`))
 							break
 						default:
 							process.exit(200);
@@ -179,16 +184,17 @@ async function start() {
 
 					data.code = 200
 					console.log(`success_handle_result raw_result ${JSON.stringify(data)}`)
+					const jsonString = JSON.stringify(data);
+					const base64Encoded = Buffer.from(jsonString, 'utf8').toString('base64');
+					console.log(`Base64StrEncode encoded_result_${base64Encoded}`)
+					await new Promise(resolve => setTimeout(resolve, 1000));
 
 				} catch (e) {
 					data.code = 300
-					data.raw_result=e.toString()
+					data.result=e.toString()
 					console.log(`failed_handle_result handle ${number} has_exception ${e}`)
 				}
 
-				const jsonString = JSON.stringify(data);
-				const base64Encoded = Buffer.from(jsonString, 'utf8').toString('base64');
-				console.log(`Base64StrEncode encoded_result_${base64Encoded}`)
 
 			}
 

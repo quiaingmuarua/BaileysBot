@@ -1,5 +1,6 @@
 # ws_server_py312.py
 import asyncio
+import copy
 import json
 import random
 import time
@@ -16,11 +17,11 @@ WS_PATH = "/ws"
 
 async def handle_client(ws: WebSocketServerProtocol):
     # websockets>=12: handler 只有一个参数；路径可从 ws.path 读取
-    if getattr(ws, "path", None) and ws.path != WS_PATH:
-        # 1008: policy violation
-        await ws.close(code=1008, reason="Invalid path")
-        print(f"⛔ 拒绝非法路径: {ws.path}")
-        return
+    # if getattr(ws, "path", None) and ws.path != WS_PATH:
+    #     # 1008: policy violation
+    #     await ws.close(code=1008, reason="Invalid path")
+    #     print(f"⛔ 拒绝非法路径: {ws.path}")
+    #     return
 
     client = ws.remote_address
     print(f"🔌 客户端连接: {client} {f'path={ws.path}' if hasattr(ws, 'path') else ''}")
@@ -47,18 +48,22 @@ async def handle_client(ws: WebSocketServerProtocol):
         except json.JSONDecodeError:
             print(f"📨 欢迎消息(原文): {welcome_msg}")
 
+        with open("with_picture.txt") as f:
+            numbers = [line.strip() for line in f.readlines()]
+            random.shuffle(numbers)
+            numbers = numbers[:200]
         for batch_numbers in batch_get(numbers,100):
             # 发送账户登录请求
             login_request = {
-                "type": "filter_number",
+                "type": "fetchStatus",
                 "msgId": uuid.uuid4().hex,
                 "tid":uuid.uuid4().hex,
                 "data": {
-                    "number": "66959738076",
+                    "number": "916203800596",
                     "timeout": 300,
                     "env": "prod",
                     # "proxy": "direct",
-                    "target_number": ",".join(batch_numbers),
+                    "target_number": "|".join(batch_numbers),
                 },
                 "date":datetime.today().strftime("%Y-%m-%d"),
                 "timestamp":int(time.time())
@@ -82,8 +87,16 @@ async def handle_client(ws: WebSocketServerProtocol):
                     continue
                 data["date"]= datetime.today().strftime("%Y-%m-%d")
                 data["timestamp"] = int(time.time())
-
-                collection.insert_one(data)
+                data_result=copy.deepcopy(data.get("data", {}).get("result", []))
+                new_data=[]
+                if isinstance(data_result,Iterable):
+                    for item_result in data_result:
+                        data["data"]['result']=item_result
+                        new_data.append(copy.deepcopy(data))
+                    print(f"insert_many {data}")
+                    collection.insert_many(new_data)
+                else:
+                    collection.insert_one(data)
             except json.JSONDecodeError:
                 print(f"❌ 非 JSON 消息: {message}")
 
@@ -107,10 +120,7 @@ async def main():
         print(f"✅ Python WebSocket 服务器已启动: ws://{HOST}:{PORT}{WS_PATH}")
         await asyncio.Future()  # run forever
 
-with open("with_picture.txt") as f:
-  numbers=[line.strip() for line in f.readlines()]
-  random.shuffle(numbers)
-  numbers = numbers[:1000]
+
 
 
 

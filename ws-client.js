@@ -1,7 +1,6 @@
 // ws-client.js - WebSocket 客户端（ESM）
 import WebSocket from 'ws';
 import {getCacheStatus, handleAccountLogin} from './accountHandler.js';
-import {raw} from "express";
 
 const DEFAULTS = {
   RECONNECT: true,
@@ -12,8 +11,7 @@ const DEFAULTS = {
 };
 
 
-const deviceId = process.env.DEVICE_ID || 'wabot_unknown';
-console.log('Device ID:', deviceId);
+
 
 
 export class WSAppClient {
@@ -94,7 +92,7 @@ export class WSAppClient {
    */
   _sendRaw(objOrString) {
     const str = typeof objOrString === 'string' ? objOrString : JSON.stringify(objOrString);
-
+    console.log("_sendRaw " + str)
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(str);
     } else {
@@ -168,7 +166,7 @@ export class WSAppClient {
       } catch (_) {}
 
       // 若超过 2 * 心跳间隔未收到 pong，判定为超时 → 强制断开触发重连
-      if (Date.now() - this._lastPongTs > this.heartbeatInterval * 2) {
+      if (Date.now() - this._lastPongTs > this.heartbeatInterval * 10) {
         this._emit('heartbeat_timeout');
         try {
           this.ws.terminate();
@@ -206,11 +204,14 @@ export class WSAppClient {
         // 收到服务器 ping → 回 pong
         this.sendMessage('pong', null, message);
         break;
+      case "ack":
+      case "connected":
+        console.log("ack " + JSON.stringify(data))
+        break;
 
       case 'get_status':
         this.sendMessage('status', getCacheStatus(), message);
         break;
-
       case 'account_login':
       case 'account_verify':
       case "filter_number":

@@ -166,7 +166,7 @@ export class WSAppClient {
       } catch (_) {}
 
       // 若超过 2 * 心跳间隔未收到 pong，判定为超时 → 强制断开触发重连
-      if (Date.now() - this._lastPongTs > this.heartbeatInterval * 10) {
+      if (Date.now() - this._lastPongTs > this.heartbeatInterval * 2) {
         this._emit('heartbeat_timeout');
         try {
           this.ws.terminate();

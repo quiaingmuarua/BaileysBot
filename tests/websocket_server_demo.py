@@ -47,35 +47,7 @@ async def handle_client(ws: WebSocketServerProtocol):
             print(f"📨 欢迎消息: {json.loads(welcome_msg)}")
         except json.JSONDecodeError:
             print(f"📨 欢迎消息(原文): {welcome_msg}")
-
-        with open("with_picture.txt") as f:
-            numbers = [line.strip() for line in f.readlines()]
-            random.shuffle(numbers)
-            numbers = numbers[:200]
-        for batch_numbers in batch_get(numbers,100):
-            # 发送账户登录请求
-            login_request = {
-                "type": "fetchStatus",
-                "msgId": uuid.uuid4().hex,
-                "tid":uuid.uuid4().hex,
-                "data": {
-                    "number": "916203800596",
-                    "timeout": 300,
-                    "env": "prod",
-                    # "proxy": "direct",
-                    "target_number": "|".join(batch_numbers),
-                },
-                "date":datetime.today().strftime("%Y-%m-%d"),
-                "timestamp":int(time.time())
-            }
-            '''
-            <iq id='027c' xmlns='w:profile:picture' to='s.whatsapp.net' target='2349130556281@s.whatsapp.net' type='get'><picture type='preview' common_gid='120363264252831569@g.us'/></iq>
-            
-            '''
-            print(f"📤 发送登录请求: {login_request}")
-            await ws.send(json.dumps(login_request))
-            break
-
+        await send_msg(ws)
         # 持续接收并打印
         async for message in ws:
             try:
@@ -93,10 +65,12 @@ async def handle_client(ws: WebSocketServerProtocol):
                     for item_result in data_result:
                         data["data"]['result']=item_result
                         new_data.append(copy.deepcopy(data))
-                    print(f"insert_many {data}")
+                    print(f"insert_many {datetime.now()} {data} ")
                     collection.insert_many(new_data)
                 else:
                     collection.insert_one(data)
+                await asyncio.sleep(60)
+                await send_msg(ws)
             except json.JSONDecodeError:
                 print(f"❌ 非 JSON 消息: {message}")
 
@@ -114,14 +88,40 @@ async def handle_client(ws: WebSocketServerProtocol):
     finally:
         print(f"👋 客户端离开: {client}")
 
+
+
+async  def send_msg(ws):
+    with open("with_picture.txt") as f:
+        numbers = [line.strip() for line in f.readlines()]
+        random.shuffle(numbers)
+        numbers = numbers[:200]
+        # 发送账户登录请求
+        login_request = {
+            "type": "fetchStatus",
+            "msgId": uuid.uuid4().hex,
+            "tid": uuid.uuid4().hex,
+            "data": {
+                "number": "919341992122",
+                "timeout": 300,
+                "env": "prod",
+                # "proxy": "direct",
+                "target_number": "|".join(numbers),
+            },
+            "date": datetime.today().strftime("%Y-%m-%d"),
+            "timestamp": int(time.time())
+        }
+        '''
+        <iq id='027c' xmlns='w:profile:picture' to='s.whatsapp.net' target='2349130556281@s.whatsapp.net' type='get'><picture type='preview' common_gid='120363264252831569@g.us'/></iq>
+
+        '''
+        print(f"📤 发送请求: {login_request}")
+        await ws.send(json.dumps(login_request))
+
 async def main():
     # websockets>=12 的 serve 只传入单参数 handler
     async with websockets.serve(handle_client, HOST, PORT):
         print(f"✅ Python WebSocket 服务器已启动: ws://{HOST}:{PORT}{WS_PATH}")
         await asyncio.Future()  # run forever
-
-
-
 
 
 def batch_get(seq, limit=1000, start=0):
@@ -131,7 +131,7 @@ def batch_get(seq, limit=1000, start=0):
         if not isinstance(seq, list):
             seq = list(seq)
         while True:
-            batch_result = seq[start : start + limit]
+            batch_result = seq[start: start + limit]
             if batch_result:
                 yield batch_result
                 start += limit
@@ -139,6 +139,7 @@ def batch_get(seq, limit=1000, start=0):
                 break
     except Exception as e:
         raise TypeError("{} 发现异常 {}".format(seq, e))
+
 
 from pymongo import MongoClient
 from datetime import datetime
@@ -150,11 +151,8 @@ mongo_uri = "mongodb://root:xiaoan666!@35.187.225.32:27017/?authMechanism=SCRAM-
 client = MongoClient(mongo_uri)
 
 # 选择数据库和集合
-db = client["token_statistic"]           # 你可以改成自己的数据库名
+db = client["token_statistic"]  # 你可以改成自己的数据库名
 collection = db["web_was_test"]  # 你可以改成自己的集合名
 
-
-
 if __name__ == "__main__":
-
     asyncio.run(main())

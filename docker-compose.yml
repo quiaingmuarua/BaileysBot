@@ -97,3 +97,107 @@ services:
     environment:
       <<: *wabot-env
       DEVICE_ID: 10
+
+  wabot11:
+    <<: *wabot-base
+    user: root
+    environment:
+      <<: *wabot-env
+      DEVICE_ID: 11
+
+  wabot12:
+    <<: *wabot-base
+    user: root
+    environment:
+      <<: *wabot-env
+      DEVICE_ID: 12
+
+  wabot13:
+    <<: *wabot-base
+    user: root
+    environment:
+      <<: *wabot-env
+      DEVICE_ID: 13
+
+  wabot14:
+    <<: *wabot-base
+    user: root
+    environment:
+      <<: *wabot-env
+      DEVICE_ID: 14
+
+  wabot15:
+    <<: *wabot-base
+    user: root
+    environment:
+      <<: *wabot-env
+      DEVICE_ID: 15
+
+  wabot16:
+    <<: *wabot-base
+    user: root
+    environment:
+      <<: *wabot-env
+      DEVICE_ID: 16
+
+  wabot17:
+    <<: *wabot-base
+    user: root
+    environment:
+      <<: *wabot-env
+      DEVICE_ID: 17
+
+  wabot18:
+    <<: *wabot-base
+    user: root
+    environment:
+      <<: *wabot-env
+      DEVICE_ID: 18
+
+  wabot19:
+    <<: *wabot-base
+    user: root
+    environment:
+      <<: *wabot-env
+      DEVICE_ID: 19
+
+  wabot20:
+    <<: *wabot-base
+    user: root
+    environment:
+      <<: *wabot-env
+      DEVICE_ID: 20
+
+  wabot21:
+    <<: *wabot-base
+    user: root
+    environment:
+      <<: *wabot-env
+      DEVICE_ID: 21
+
+  wabot22:
+    <<: *wabot-base
+    user: root
+    environment:
+      <<: *wabot-env
+      DEVICE_ID: 22
+
+  wabot23:
+    <<: *wabot-base
+    user: root
+    environment:
+      <<: *wabot-env
+      DEVICE_ID: 23
+  wabot24:
+    <<: *wabot-base
+    user: root
+    environment:
+      <<: *wabot-env
+      DEVICE_ID: 24
+
+  wabot25:
+    <<: *wabot-base
+    user: root
+    environment:
+      <<: *wabot-env
+      DEVICE_ID: 25

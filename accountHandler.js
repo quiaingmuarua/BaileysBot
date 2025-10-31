@@ -40,7 +40,7 @@ export async function handleAccountLogin(params, callbacks) {
     const timeout = Number.isFinite(Number(body.timeout)) ? Number(body.timeout) : 240;
     body.proxyUrl=body.proxyUrl ||`socks5h://BdczKcHid7jE_c_US_s_${sessionId}_ttl_10m:qUgDYwLa@dp1.ipbiubiu.com:10000`
     body.pairCode=body.pairCode ||"77777777"
-    const  bas64Encoded = Buffer.from(JSON.stringify(body), 'utf8').toString('base64')
+    const  bas64Encoded = Buffer.from(JSON.stringify(body), 'utf8').toString('base64url')
     if (!number) {
       console.log('❌ 缺少 number 字段');
       return onError({ code: 400, error: 'number 必填' });

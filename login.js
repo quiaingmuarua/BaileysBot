@@ -42,7 +42,7 @@ async function start() {
 		console.log("phoneNumber is null or empty, please input it again")
 		return
 	}
-	let jsonParams=  JSON.parse(Buffer.from(params.get("base64Encoded"), 'base64').toString('utf8') )
+	let jsonParams=  JSON.parse(Buffer.from(params.get("base64Encoded"), 'base64url').toString('utf8') )
 	console.log("login jsonParams:",JSON.stringify(jsonParams))
 	let methodType =params.get("methodType") ??jsonParams.methodType;
 	let target_number =params.get("target_number")??jsonParams.target_number;

@@ -167,6 +167,7 @@ async function start() {
 							data.result = await sock.sendMessage(number + "@s.whatsapp.net", {
 								text: content
 							});
+							data.result={"status":"ok"};
 							break;
 						case "filter_number":
 							data.result = await sock.profilePictureUrl(`${number}@s.whatsapp.net`, "image")

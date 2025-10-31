@@ -195,6 +195,13 @@ services:
       <<: *wabot-env
       DEVICE_ID: 24
 
+  wabot25:
+    <<: *wabot-base
+    user: root
+    environment:
+      <<: *wabot-env
+      DEVICE_ID: 25
+
   wabot26:
     <<: *wabot-base
     user: root

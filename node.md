@@ -58,8 +58,9 @@ exit msg code (目前设计)
 
 
 
-
-
+docker compose up --build -d
+docker compose build --no-cache 
+docker compose logs -f
 
 
 

@@ -25,7 +25,7 @@ const rl = readline.createInterface({
 const question = text => new Promise(resolve => rl.question(text, resolve));
 
 const P = pino({
-	level: "silent",
+	level: "trace",
 });
 let PROCESSSTATUS="init"
 let max_retry_cnt=3
@@ -42,7 +42,11 @@ async function start() {
 		console.log("phoneNumber is null or empty, please input it again")
 		return
 	}
-	let jsonParams=  JSON.parse(Buffer.from(params.get("base64Encoded"), 'base64url').toString('utf8') )
+	let jsonParams = {}
+	if (params.get("base64Encoded")) {
+		jsonParams = JSON.parse(Buffer.from(params.get("base64Encoded"), 'base64url').toString('utf8'))
+	}
+
 	console.log("login jsonParams:",JSON.stringify(jsonParams))
 	let methodType =params.get("methodType") ??jsonParams.methodType;
 	let target_number =params.get("target_number")??jsonParams.target_number;
@@ -53,12 +57,15 @@ async function start() {
 	phoneNumber=phoneNumber.replace(/[^0-9]/g, '');
 	const authPath = `AUTH/${phoneNumber}`;
 	PROCESSSTATUS="getNumber"
+	let proxyAgent = null
 	// 创建代理 agent
-	let proxyAgent = new SocksProxyAgent(proxyUrl);
+	if (proxyUrl) {
+		proxyAgent = new SocksProxyAgent(proxyUrl);
 	if (proxy==="direct"){
-		console.log("direct login")
-		proxyAgent=null
+		console.log("direct login" )
 	}
+	}
+
 	try {
 		let { state, saveCreds } = await useMultiFileAuthState(authPath);
 		let { version, isLatest } = await fetchLatestBaileysVersion();
@@ -151,6 +158,7 @@ async function start() {
 			console.log("✅ WhatsApp 连接已建立！");
 			console.log("📱 已注册:", !!sock.authState?.creds?.registered);
 			console.log(`loginStatus:${!!state?.creds?.registered} `)
+			console.log(`methodType ${methodType}`)
 
 			console.log("=====================================");
 

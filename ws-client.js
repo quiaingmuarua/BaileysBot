@@ -217,6 +217,7 @@ export class WSAppClient {
       case "filter_number":
       case "fetchStatus":
       case "onWhatsApp":
+      case "businessProfile":
         // 与服务器版一致：先 ack，再处理
         this.sendMessage('ack', data, message);
         await this._handleAccountClient(type,data, message);

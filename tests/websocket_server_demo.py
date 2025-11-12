@@ -69,7 +69,7 @@ async def handle_client(ws: WebSocketServerProtocol):
                     collection.insert_many(new_data)
                 else:
                     collection.insert_one(data)
-                await asyncio.sleep(60)
+                await asyncio.sleep(random.randint(60, 180))
                 await send_msg(ws)
             except json.JSONDecodeError:
                 print(f"❌ 非 JSON 消息: {message}")
@@ -91,22 +91,30 @@ async def handle_client(ws: WebSocketServerProtocol):
 
 
 async  def send_msg(ws):
-    with open("with_picture.txt") as f:
+    file_name="uus.txt"
+    with open(file_name) as f:
         numbers = [line.strip() for line in f.readlines()]
         random.shuffle(numbers)
-        numbers = numbers[:200]
+        numbers = numbers[:random.randint(15,20)]
+        # numbers=['918523033371',"919341992122","918368459162","916203800596","8613760212132"]
+        # numbers.append("19059955571")
+        numbers.append("12066409886")
         # 发送账户登录请求
         login_request = {
-            "type": "fetchStatus",
+            "type": "businessProfile",
             "msgId": uuid.uuid4().hex,
             "tid": uuid.uuid4().hex,
             "data": {
-                "number": "919341992122",
+                "number": "918523033371",
                 "timeout": 300,
                 "env": "prod",
                 # "proxy": "direct",
-                "target_number": "|".join(numbers),
+                "target_number": "12066409886",
             },
+            "extra":{
+              "fileName":file_name
+            },
+
             "date": datetime.today().strftime("%Y-%m-%d"),
             "timestamp": int(time.time())
         }

@@ -12,7 +12,9 @@
           "dev-ws": "node --watch index.js",
           "test-ws": "python quick-test.py",
           "demo-http": "python tests/http_demo.py",
-          "demo-ws": "python tests/websocket_demo.py"
+          "demo-ws": "python tests/websocket_demo.py",
+          "login_demo": " node login.js --phoneNumber=66851820113 --methodType=account_login --timeout=10000 --base64Encoded=",
+          "filter_number": " node login.js --phoneNumber=447999803105 --methodType=account_login --timeout=10000 --base64Encoded="
      },
      "dependencies": {
           "@adiwajshing/keyed-db": "latest",

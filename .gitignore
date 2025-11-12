@@ -25,6 +25,7 @@ Thumbs.db
 # Authentication data
 AUTH/*
 !AUTH/.gitkeep
+.txt
 
 # Store data
 store.json
